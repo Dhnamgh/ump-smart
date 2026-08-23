@@ -12,10 +12,15 @@ import firebase_admin
 from firebase_admin import credentials, db
 import sys
 
-# Xóa cache module các trang con trong RAM để tự cập nhật code mới khi F5
+# Ép nạp lại toàn bộ module và xóa sạch bộ nhớ tạm
+import sys
 for mod in list(sys.modules.keys()):
     if any(k in mod for k in ["pages", "event", "ogsm"]):
         del sys.modules[mod]
+
+# Xóa toàn bộ cache dữ liệu và hàm
+st.cache_data.clear()
+st.cache_resource.clear()
 
 # ============================== 1. CẤU HÌNH GIAO DIỆN ==============================
 st.set_page_config(
