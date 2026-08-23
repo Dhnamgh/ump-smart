@@ -18,10 +18,6 @@ for mod in list(sys.modules.keys()):
     if any(k in mod for k in ["pages", "event", "ogsm"]):
         del sys.modules[mod]
 
-# Xóa toàn bộ cache dữ liệu và hàm
-st.cache_data.clear()
-st.cache_resource.clear()
-
 # ============================== 1. CẤU HÌNH GIAO DIỆN ==============================
 st.set_page_config(
     page_title="APP ĐIỂM DANH",
