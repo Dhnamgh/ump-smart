@@ -12,12 +12,6 @@ import firebase_admin
 from firebase_admin import credentials, db
 import sys
 
-# Ép nạp lại toàn bộ module và xóa sạch bộ nhớ tạm
-import sys
-for mod in list(sys.modules.keys()):
-    if any(k in mod for k in ["pages", "event", "ogsm"]):
-        del sys.modules[mod]
-
 # ============================== 1. CẤU HÌNH GIAO DIỆN ==============================
 st.set_page_config(
     page_title="APP ĐIỂM DANH",
