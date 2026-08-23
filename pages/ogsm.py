@@ -3,11 +3,6 @@ import os
 from pathlib import Path
 import streamlit as st
 
-import sys
-import os
-from pathlib import Path
-import streamlit as st
-
 # 0. ============================ KÍCH HOẠT KHÓA BẢO MẬT OGSM ============================
 def check_ogsm_password():
     if st.session_state.get("ogsm_authenticated", False):
@@ -16,7 +11,6 @@ def check_ogsm_password():
     st.title("🔒 BẢO MẬT PHÂN HỆ OGSM")
     st.caption("Vui lòng nhập mật khẩu để truy cập hệ thống Quản trị OGSM.")
 
-    # Quét tìm mật khẩu trong Secrets (tự động nhận diện mọi vị trí)
     correct_password = ""
     if "ogsm_password" in st.secrets:
         correct_password = str(st.secrets["ogsm_password"]).strip()
@@ -27,7 +21,7 @@ def check_ogsm_password():
                 break
 
     if not correct_password:
-        st.error("⚠️ Chưa tìm thấy cấu hình 'ogsm_password' trong Streamlit Secrets! Vui lòng kiểm tra lại Settings > Secrets.")
+        st.error("⚠️ Chưa tìm thấy cấu hình 'ogsm_password' trong Streamlit Secrets!")
         st.stop()
 
     with st.form("ogsm_login_form"):
@@ -39,17 +33,16 @@ def check_ogsm_password():
                 st.rerun()
             else:
                 st.error("❌ Mật khẩu không chính xác!")
-
     st.stop()
 
-# Gọi hàm kích hoạt
 check_ogsm_password()
 
-# Gọi hàm bảo mật
-check_ogsm_password()
-
-# Nút Đăng xuất ở góc màn hình
-col_title, col_logout = st.columns([8, 2])
+# Nút Đăng xuất & Nút Làm mới dữ liệu ở góc màn hình
+col_title, col_refresh, col_logout = st.columns([7, 2, 1.5])
+with col_refresh:
+    if st.button("🔄 Làm mới dữ liệu"):
+        st.cache_data.clear()
+        st.rerun()
 with col_logout:
     if st.button("🔒 Đăng xuất"):
         st.session_state["ogsm_authenticated"] = False
@@ -65,7 +58,6 @@ from config import load_config
 from logger import get_logger
 
 logger = get_logger()
-
 try:
     load_config()
 except Exception as e:
@@ -75,7 +67,6 @@ except Exception as e:
 st.title("QUẢN TRỊ CHIẾN LƯỢC OGSM")
 st.caption("Đại học Y Dược TP.HCM")
 
-# 3. Danh sách các trang con nằm trong thư mục ogsm/
 ogsm_subpages = {
     "Dashboard": OGSM_DIR / "1_Dashboard.py",
     "OGSM Tree": OGSM_DIR / "2_OGSM_Tree.py",
@@ -83,7 +74,6 @@ ogsm_subpages = {
     "Data Management": OGSM_DIR / "4_Data_Management.py"
 }
 
-# 4. Thanh chuyển phân hệ dạng nút bấm nằm ngang (Chữ thuần túy)
 selected_page_name = st.radio(
     label="Phân hệ OGSM",
     options=list(ogsm_subpages.keys()),
@@ -93,9 +83,7 @@ selected_page_name = st.radio(
 
 st.markdown("---")
 
-# 5. Thực thi file giao diện tương ứng
 target_file_path = ogsm_subpages[selected_page_name]
-
 if target_file_path.exists():
     with open(target_file_path, encoding="utf-8") as f:
         code = f.read()
