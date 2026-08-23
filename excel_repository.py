@@ -1,6 +1,6 @@
 """
 OpenPyXL and Pandas Excel Repository matching official 29 UMP Units + Test Departments (Bộ môn).
-Đọc và ghi dữ liệu OGSM trực tiếp qua Microsoft Graph API.
+Đọc và ghi dữ liệu OGSM trực tiếp qua Microsoft Graph API (Tối ưu tải song song).
 """
 
 import io
@@ -8,6 +8,7 @@ import os
 import re
 import unicodedata
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List
 from graph_client import MicrosoftGraphClient
 from base_repository import BaseOGSMRepository
@@ -198,7 +199,41 @@ class ExcelOneDriveRepository(BaseOGSMRepository):
 
         return pd.DataFrame(rows)
 
+    def _process_single_file(self, f: dict, data_folder_id: str) -> Optional[pd.DataFrame]:
+        """Tải và chuyển đổi 1 file đơn vị."""
+        file_name = f["name"]
+        unit_code = self._clean_unit_code(file_name)
+        try:
+            file_bytes = self.graph_client.download_file_by_folder_id(data_folder_id, file_name)
+            buffer = io.BytesIO(file_bytes)
+            df_raw = pd.read_excel(buffer, engine="openpyxl")
+
+            cols_str = " ".join([str(c) for c in df_raw.columns]).lower()
+            has_valid_header = any(k in cols_str for k in ["objects", "measure", "goals", "kpi"])
+
+            if not has_valid_header:
+                header_row = 0
+                for r_idx in range(min(5, len(df_raw))):
+                    row_vals = [str(v).lower() for v in df_raw.iloc[r_idx].values]
+                    if any("objects" in v or "measure" in v or "goals" in v for v in row_vals):
+                        header_row = r_idx + 1
+                        break
+
+                if header_row > 0:
+                    buffer.seek(0)
+                    df_raw = pd.read_excel(buffer, engine="openpyxl", header=header_row)
+
+            df_transformed = self._transform_custom_excel(df_raw, unit_code)
+            if not df_transformed.empty:
+                df_transformed["Unit_Code"] = unit_code
+                df_transformed["Source_File"] = file_name
+                return df_transformed
+        except Exception as e:
+            logger.error(f"Lỗi đọc file {file_name}: {e}")
+        return None
+
     def fetch_master_dataframe(self) -> pd.DataFrame:
+        """Đọc và gộp dữ liệu toàn bộ các đơn vị song song (tối đa 10 luồng)."""
         data_folder_id = self.config.onedrive.data_folder_id
         files = self.graph_client.list_files_in_folder_id(data_folder_id)
         if not files:
@@ -206,39 +241,11 @@ class ExcelOneDriveRepository(BaseOGSMRepository):
 
         aggregated_dfs: List[pd.DataFrame] = []
 
-        for f in files:
-            file_name = f["name"]
-            unit_code = self._clean_unit_code(file_name)
-
-            try:
-                file_bytes = self.graph_client.download_file_by_folder_id(data_folder_id, file_name)
-                buffer = io.BytesIO(file_bytes)
-                df_raw = pd.read_excel(buffer, engine="openpyxl")
-
-                cols_str = " ".join([str(c) for c in df_raw.columns]).lower()
-                has_valid_header = any(k in cols_str for k in ["objects", "measure", "goals", "kpi"])
-
-                if not has_valid_header:
-                    header_row = 0
-                    for r_idx in range(min(5, len(df_raw))):
-                        row_vals = [str(v).lower() for v in df_raw.iloc[r_idx].values]
-                        if any("objects" in v or "measure" in v or "goals" in v for v in row_vals):
-                            header_row = r_idx + 1
-                            break
-
-                    if header_row > 0:
-                        buffer.seek(0)
-                        df_raw = pd.read_excel(buffer, engine="openpyxl", header=header_row)
-
-                df_transformed = self._transform_custom_excel(df_raw, unit_code)
-
-                if not df_transformed.empty:
-                    df_transformed["Unit_Code"] = unit_code
-                    df_transformed["Source_File"] = file_name
-                    aggregated_dfs.append(df_transformed)
-
-            except Exception as e:
-                logger.error(f"Lỗi đọc file {file_name}: {e}")
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = executor.map(lambda f: self._process_single_file(f, data_folder_id), files)
+            for res in results:
+                if res is not None and not res.empty:
+                    aggregated_dfs.append(res)
 
         if not aggregated_dfs:
             return pd.DataFrame(columns=self.REQUIRED_COLUMNS + ["Unit_Code", "Source_File", "Target_Year"])
