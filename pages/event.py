@@ -66,7 +66,7 @@ DANH_MUC_DON_VI_LON = [
     "Khác"
 ]
 
-# Danh mục đơn vị phục vụ chọn đơn vị tham dự (loại bỏ Ban Giám hiệu, Đảng ủy, Khác)
+# Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
 # ==============================================================================
@@ -234,14 +234,12 @@ def parse_time(text):
     return None
 
 def clean_text(value):
-    """Làm sạch chuỗi ký tự, ngăn chặn tuyệt đối lỗi Pandas Series/DataFrame"""
     if value is None: return ""
     if isinstance(value, (pd.Series, pd.DataFrame, list)): return ""
     if pd.isna(value): return ""
     return str(value).strip()
 
 def is_holiday_event(event_name):
-    """Kiểm tra sự kiện có phải là nghỉ lễ, tết để tô đỏ trên lịch"""
     txt = clean_text(event_name).lower()
     keywords = ["nghỉ lễ", "nghi le", "tết", "tet", "quốc khánh", "quoc khanh", "giỗ tổ", "gio to", "chiến thắng", "30/4", "1/5", "2/9", "dương lịch", "âm lịch"]
     return any(k in txt for k in keywords)
@@ -262,7 +260,7 @@ def count_value(value):
 
 def event_color(index, key, is_holiday=False):
     if is_holiday:
-        return "#EF4444"  # Màu đỏ cảnh báo nghỉ lễ
+        return "#EF4444"
     palette = ["#DBEAFE", "#DCFCE7", "#FEE2E2", "#FFEDD5", "#F3E8FF", "#CCFBF1", "#FCE7F3", "#E0E7FF", "#CFFAFE", "#FEF3C7"]
     digest = int(hashlib.md5(str(key).encode("utf-8")).hexdigest(), 16)
     return palette[(digest + index) % len(palette)]
@@ -488,7 +486,6 @@ def process_raw_dataframe(df_raw):
         "Thành phần tham dự": "thanh_phan", "Đại biểu tham dự": "thanh_phan"
     })
 
-    # Lọc lại lần nữa đảm bảo không có cột thanh_phan kép
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
     df["start"] = df["start"].apply(parse_event_date)
@@ -636,7 +633,7 @@ def build_detailed_support_table_html(raw_data):
     """
 
 # ==============================================================================
-# 4. KHỞI TẠO STATE & KHAI BÁO MENU
+# 4. KHỞI TẠO STATE & TÍNH TOÁN SỐ LƯỢNG CẢNH BÁO / PHÊ DUYỆT
 # ==============================================================================
 df = load_data()
 bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
@@ -649,17 +646,43 @@ if "reg_start_date" not in st.session_state: st.session_state.reg_start_date = t
 if "reg_end_date" not in st.session_state: st.session_state.reg_end_date = today.date()
 if "reg_prev_start_date" not in st.session_state: st.session_state.reg_prev_start_date = st.session_state.reg_start_date
 
-# Tính toán số lượng sự kiện chờ phê duyệt
+# 1. Tính số lượng sự kiện chờ duyệt
 num_pending = 0
 if not df.empty:
     num_pending = len(df[df.apply(approval_text_from_row, axis=1) == ""])
 
 phe_duyet_label = f"Phê duyệt 🔴 {num_pending}" if num_pending > 0 else "Phê duyệt"
 
-menu_options = ["Dashboard", "Đăng ký", "Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI", phe_duyet_label, "Liên hệ"]
+# 2. Tính số lượng xung đột trùng lịch (trong vòng 30 ngày tới)
+num_conflicts = 0
+if not df.empty:
+    now_ts = datetime.now()
+    limit_ts = now_ts + timedelta(days=30)
+    upcoming_events = df[(df["start"] >= now_ts) & (df["start"] <= limit_ts)].copy()
+    
+    for i, j in [(i, j) for i in range(len(upcoming_events)) for j in range(i+1, len(upcoming_events))]:
+        a, b = upcoming_events.iloc[i], upcoming_events.iloc[j]
+        if a["start"] < b["end"] and b["start"] < a["end"]:
+            a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
+            has_delegate_conflict = any(name in a_tp and name in b_tp for name in leader_names_to_check)
+            has_broad_conflict = ("Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp) or \
+                                 ("Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp)
+            has_loc_conflict = bool(clean_text(a["location"]) and clean_text(a["location"]).lower() == clean_text(b["location"]).lower())
+            
+            # Ghi nhận là xung đột nếu trùng giờ hoặc trùng địa điểm hoặc trùng người
+            num_conflicts += 1
+
+canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
+
+menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, "Hỗ trợ", "Truy vấn AI", phe_duyet_label, "Liên hệ"]
 selected_menu = st.sidebar.radio("", menu_options, label_visibility="collapsed")
 
-menu = "Phê duyệt" if selected_menu.startswith("Phê duyệt") else selected_menu
+if selected_menu.startswith("Phê duyệt"):
+    menu = "Phê duyệt"
+elif selected_menu.startswith("Cảnh báo"):
+    menu = "Cảnh báo"
+else:
+    menu = selected_menu
 
 # Danh sách lọc đơn vị lớn ở sidebar
 donvi_parent_list = sorted([d for d in df["donvi_parent"].dropna().unique() if d]) if not df.empty else []
@@ -903,11 +926,8 @@ elif menu == "Đăng ký":
         f1, f2 = st.columns(2)
         with f1: 
             event_name = st.text_input("Tên sự kiện")
-            
-            # Mặc định đơn vị là 'P. Hành chính Tổng hợp'
             default_donvi_idx = DANH_MUC_DON_VI_LON.index("P. Hành chính Tổng hợp") if "P. Hành chính Tổng hợp" in DANH_MUC_DON_VI_LON else 0
             donvi_lon = st.selectbox("Đơn vị lớn phụ trách/tổ chức", DANH_MUC_DON_VI_LON, index=default_donvi_idx)
-            
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
@@ -1047,7 +1067,9 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     "Chi tiết xung đột": muc_do
                 })
         if not conf: st.success(f"✅ {label} không phát hiện trùng lịch.")
-        else: show_table_with_download(f"{label}", pd.DataFrame(conf), f"cb_{period}.xlsx", compact=True)
+        else:
+            st.error(f"⚠️ Phát hiện {len(conf)} xung đột lịch trong {label.lower()}!")
+            show_table_with_download(f"{label}", pd.DataFrame(conf), f"cb_{period}.xlsx", compact=True)
         
     elif menu == "Hỗ trợ":
         st.markdown('<div class="table-title">Hỗ trợ</div>', unsafe_allow_html=True)
