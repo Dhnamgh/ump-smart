@@ -925,7 +925,7 @@ elif menu == "Đăng ký":
                     new_row["Số lượng bàn đón tiếp"], new_row["Cần trải khăn bàn hội trường"], new_row["Số lượng lễ tân"], new_row["Số lượng bảng tên (bảng mica)"], new_row["Số lượng bìa ký kết"], new_row["Số lượng nước uống"], new_row["Số phần Teabreak"], new_row["Số lượng hoa để bàn"], new_row["Số lượng hoa để bục phát biểu"], new_row["Số lượng hoa bó để tặng"], new_row["Số lượng quà tặng"], new_row["Số lượng Brochure"], new_row["Số lượng khay bưng"], new_row["Số lượng bandroll, standee cần in và thi công"], new_row["Số lượng Backdrop cần in và thi công"], new_row["Cần chạy bảng điện tử"], new_row["Nội dung chạy bảng điện tử (nếu có)"], new_row["Cần gửi thư mời"], new_row["Các yêu cầu khác (nếu có)"] = support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_khac
                     
                     new_row["Thành phần tham dự"] = final_thanh_phan
-                    new_row["thanh_phan"] = final_thanh_phan
+                    
                     
                     if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
                         send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), location)
