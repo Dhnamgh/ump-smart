@@ -239,6 +239,20 @@ def clean_text(value):
     if pd.isna(value): return ""
     return str(value).strip()
 
+def normalize_loc(loc_str):
+    """Chuẩn hóa chuỗi địa điểm để so khớp chính xác"""
+    txt = clean_text(loc_str).lower()
+    txt = re.sub(r"\s+", " ", txt)
+    return txt
+
+def is_same_location(loc1, loc2):
+    """Kiểm tra 2 sự kiện có cùng địa điểm tổ chức hay không"""
+    l1 = normalize_loc(loc1)
+    l2 = normalize_loc(loc2)
+    if not l1 or not l2 or l1 in ["trực tuyến", "online", "zoom", "teams"]:
+        return False
+    return (l1 == l2) or (l1 in l2) or (l2 in l1)
+
 def is_holiday_event(event_name):
     txt = clean_text(event_name).lower()
     keywords = ["nghỉ lễ", "nghi le", "tết", "tet", "quốc khánh", "quoc khanh", "giỗ tổ", "gio to", "chiến thắng", "30/4", "1/5", "2/9", "dương lịch", "âm lịch"]
@@ -395,7 +409,6 @@ def read_onedrive_excel() -> pd.DataFrame:
 
 @st.cache_data(ttl=300)
 def load_ump_leaders():
-    """Tự động đọc file UMP_Leader.xlsx từ /OGSM/EVENT/ trên OneDrive"""
     try:
         token = get_azure_token()
         url = get_onedrive_file_url("UMP_Leader.xlsx")
@@ -461,7 +474,6 @@ def process_raw_dataframe(df_raw):
     if df_raw.empty: return df_raw
     df = df_raw.copy()
     
-    # Khử sạch cột trùng lặp hoặc các cột tự sinh đuôi .1, .2
     df = df.loc[:, ~df.columns.str.contains(r'\.\d+$')].copy()
     df = df.loc[:, ~df.columns.duplicated()].copy()
     df.columns = df.columns.astype(str).str.strip()
@@ -667,10 +679,10 @@ if not df.empty:
             has_delegate_conflict = any(name in a_tp and name in b_tp for name in leader_names_to_check)
             has_broad_conflict = ("Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp) or \
                                  ("Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp)
-            has_loc_conflict = bool(clean_text(a["location"]) and clean_text(a["location"]).lower() == clean_text(b["location"]).lower())
+            has_loc_conflict = is_same_location(a.get("location", ""), b.get("location", ""))
             
-            # Ghi nhận là xung đột nếu trùng giờ hoặc trùng địa điểm hoặc trùng người
-            num_conflicts += 1
+            if has_loc_conflict or has_delegate_conflict or has_broad_conflict or (a["start"] < b["end"] and b["start"] < a["end"]):
+                num_conflicts += 1
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
@@ -733,7 +745,6 @@ if menu == "Dashboard":
         time_label = s.strftime("%H:%M") if has_time else "Cả ngày"
         location = clean_text(r.get("location", ""))
         
-        # Tiêu đề sự kiện trên lịch
         prefix_icon = "🔴 [NGHỈ LỄ] " if is_holiday else ""
         title = f"{prefix_icon}{time_label} - {event_name_str}" + (f"\n📍 {location}" if location else "")
         
@@ -883,7 +894,6 @@ elif menu == "Đăng ký":
     st.markdown('<div class="table-title">👥 Thành phần Đại biểu tham dự</div>', unsafe_allow_html=True)
     
     with st.container(border=True):
-        # 1. Ban Giám hiệu
         st.markdown("**1. Ban Giám hiệu**")
         select_all_bgh = st.checkbox("Chọn tất cả Ban Giám hiệu (3 thành viên)", value=False)
         if select_all_bgh:
@@ -900,7 +910,6 @@ elif menu == "Đăng ký":
             )
             
         st.markdown("---")
-        # 2. Lãnh đạo diện rộng
         st.markdown("**2. Lãnh đạo các đơn vị trực thuộc**")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -909,7 +918,6 @@ elif menu == "Đăng ký":
             all_leaders_opt = st.checkbox("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)")
 
         st.markdown("---")
-        # 3. Chọn đơn vị tham dự cụ thể (Tìm kiếm thông minh)
         st.markdown("**3. Chọn Đơn vị tham dự cụ thể (gõ tìm kiếm)**")
         selected_custom_donvi = st.multiselect(
             "Gõ tên để tìm nhanh đơn vị tham dự (Khoa / Phòng / Trung tâm / Bệnh viện):",
@@ -918,7 +926,6 @@ elif menu == "Đăng ký":
         )
 
         st.markdown("---")
-        # 4. Thành phần khác
         st.markdown("**4. Thành phần Khác**")
         other_delegates_txt = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Ban Tổ chức, Tổ ANTT, Thư ký...")
 
@@ -971,7 +978,6 @@ elif menu == "Đăng ký":
             with st.spinner("Đang lưu sự kiện..."):
                 donvi_display = f"{donvi_lon} - {bomon_to.strip()}" if bomon_to.strip() else donvi_lon
                 
-                # Tổng hợp danh sách đại biểu tham dự
                 thanh_phan_list = []
                 if bgh_selected: thanh_phan_list.extend(bgh_selected)
                 if chiefs_opt: thanh_phan_list.append("Trưởng các đơn vị thuộc và trực thuộc")
@@ -991,7 +997,6 @@ elif menu == "Đăng ký":
                     
                     new_row["Số lượng bàn đón tiếp"], new_row["Cần trải khăn bàn hội trường"], new_row["Số lượng lễ tân"], new_row["Số lượng bảng tên (bảng mica)"], new_row["Số lượng bìa ký kết"], new_row["Số lượng nước uống"], new_row["Số phần Teabreak"], new_row["Số lượng hoa để bàn"], new_row["Số lượng hoa để bục phát biểu"], new_row["Số lượng hoa bó để tặng"], new_row["Số lượng quà tặng"], new_row["Số lượng Brochure"], new_row["Số lượng khay bưng"], new_row["Số lượng bandroll, standee cần in và thi công"], new_row["Số lượng Backdrop cần in và thi công"], new_row["Cần chạy bảng điện tử"], new_row["Nội dung chạy bảng điện tử (nếu có)"], new_row["Cần gửi thư mời"], new_row["Các yêu cầu khác (nếu có)"] = support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_khac
                     
-                    # Chỉ gán vào cột duy nhất chuẩn hóa
                     new_row["Thành phần tham dự"] = final_thanh_phan
                     
                     if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
@@ -1044,28 +1049,38 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             if a["start"] < b["end"] and b["start"] < a["end"]:
                 a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
                 
-                # Quét trùng nhân sự BGH
+                # 1. Quét trùng nhân sự BGH & Lãnh đạo
                 trung_nguoi = []
                 for name in leader_names_to_check:
                     if name in a_tp and name in b_tp:
                         trung_nguoi.append(name)
                 
-                # Quét trùng diện rộng
                 if "Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp:
                     trung_nguoi.append("Trưởng các đơn vị")
                 if "Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp:
                     trung_nguoi.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
 
-                muc_do = "Trùng địa điểm" if clean_text(a["location"]).lower() == clean_text(b["location"]).lower() else "Trùng giờ"
+                # 2. Quét trùng địa điểm
+                loc_a = clean_text(a.get("location", ""))
+                loc_b = clean_text(b.get("location", ""))
+                is_loc_dup = is_same_location(loc_a, loc_b)
+
+                # 3. Tổng hợp chi tiết loại xung đột
+                conflict_reasons = []
+                if is_loc_dup:
+                    conflict_reasons.append(f"📍 Trùng địa điểm ({loc_a})")
                 if trung_nguoi:
-                    muc_do += f" | 👥 Trùng đại biểu: {', '.join(trung_nguoi)}"
+                    conflict_reasons.append(f"👥 Trùng đại biểu: {', '.join(trung_nguoi)}")
+                if not is_loc_dup and not trung_nguoi:
+                    conflict_reasons.append("🕒 Trùng khung giờ")
 
                 conf.append({
                     "Thời gian": a["start"].strftime("%d/%m/%Y %H:%M"),
                     "Sự kiện 1": clean_text(a["event"]),
                     "Sự kiện 2": clean_text(b["event"]),
-                    "Chi tiết xung đột": muc_do
+                    "Chi tiết xung đột": " | ".join(conflict_reasons)
                 })
+                
         if not conf: st.success(f"✅ {label} không phát hiện trùng lịch.")
         else:
             st.error(f"⚠️ Phát hiện {len(conf)} xung đột lịch trong {label.lower()}!")
