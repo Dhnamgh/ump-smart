@@ -66,6 +66,9 @@ DANH_MUC_DON_VI_LON = [
     "Khác"
 ]
 
+# Danh mục đơn vị phục vụ chọn đơn vị tham dự (loại bỏ Ban Giám hiệu, Đảng ủy, Khác)
+DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
+
 # ==============================================================================
 # 1. GIAO DIỆN & CSS (TỐI ƯU TOÀN DIỆN CHO MOBILE RESPONSIVE)
 # ==============================================================================
@@ -231,8 +234,17 @@ def parse_time(text):
     return None
 
 def clean_text(value):
+    """Làm sạch chuỗi ký tự, ngăn chặn tuyệt đối lỗi Pandas Series/DataFrame"""
+    if value is None: return ""
+    if isinstance(value, (pd.Series, pd.DataFrame, list)): return ""
     if pd.isna(value): return ""
     return str(value).strip()
+
+def is_holiday_event(event_name):
+    """Kiểm tra sự kiện có phải là nghỉ lễ, tết để tô đỏ trên lịch"""
+    txt = clean_text(event_name).lower()
+    keywords = ["nghỉ lễ", "nghi le", "tết", "tet", "quốc khánh", "quoc khanh", "giỗ tổ", "gio to", "chiến thắng", "30/4", "1/5", "2/9", "dương lịch", "âm lịch"]
+    return any(k in txt for k in keywords)
 
 def is_yes(value):
     return clean_text(value).upper() in ["CÓ", "CO", "YES", "Y", "TRUE", "1"]
@@ -248,7 +260,9 @@ def count_value(value):
         except Exception: return 0
     return 1 if up in ["CÓ", "CO", "YES", "Y", "TRUE"] else 1
 
-def event_color(index, key):
+def event_color(index, key, is_holiday=False):
+    if is_holiday:
+        return "#EF4444"  # Màu đỏ cảnh báo nghỉ lễ
     palette = ["#DBEAFE", "#DCFCE7", "#FEE2E2", "#FFEDD5", "#F3E8FF", "#CCFBF1", "#FCE7F3", "#E0E7FF", "#CFFAFE", "#FEF3C7"]
     digest = int(hashlib.md5(str(key).encode("utf-8")).hexdigest(), 16)
     return palette[(digest + index) % len(palette)]
@@ -391,11 +405,11 @@ def load_ump_leaders():
         res = requests.get(url, headers=headers)
         if res.status_code == 200:
             df_leader = pd.read_excel(BytesIO(res.content))
+            df_leader = df_leader.loc[:, ~df_leader.columns.duplicated()].copy()
             for col in ["Nhom_Dai_Bieu", "Hoc_Ham_Hoc_Vi", "Ho_Va_Ten", "Chuc_Vu", "Don_Vi"]:
                 if col in df_leader.columns:
                     df_leader[col] = df_leader[col].fillna("").astype(str).str.strip()
             
-            # Tự động ghép chuỗi hiển thị
             df_leader["display_name"] = df_leader.apply(
                 lambda r: f"{r.get('Hoc_Ham_Hoc_Vi', '')} {r.get('Ho_Va_Ten', '')} - {r.get('Chuc_Vu', '')}".strip(" -"), 
                 axis=1
@@ -408,7 +422,6 @@ def load_ump_leaders():
     except Exception:
         pass
     
-    # Dự phòng mặc định nếu file chưa kịp đọc
     default_bgh = [
         "GS.TS. Trần Diệp Tuấn - Hiệu trưởng",
         "PGS.TS. Nguyễn Văn Chinh - Phó Hiệu trưởng",
@@ -449,7 +462,12 @@ def parse_event_date(value):
 def process_raw_dataframe(df_raw):
     if df_raw.empty: return df_raw
     df = df_raw.copy()
+    
+    # Khử sạch cột trùng lặp hoặc các cột tự sinh đuôi .1, .2
+    df = df.loc[:, ~df.columns.str.contains(r'\.\d+$')].copy()
+    df = df.loc[:, ~df.columns.duplicated()].copy()
     df.columns = df.columns.astype(str).str.strip()
+
     df = df.rename(columns={
         "Tên sự kiện": "event", "Đơn vị phụ trách/ tổ chức": "donvi",
         "Ngày tổ chức": "start", "Ngày kết thúc": "end", "Địa điểm tổ chức": "location",
@@ -470,6 +488,9 @@ def process_raw_dataframe(df_raw):
         "Thành phần tham dự": "thanh_phan", "Đại biểu tham dự": "thanh_phan"
     })
 
+    # Lọc lại lần nữa đảm bảo không có cột thanh_phan kép
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
     df["start"] = df["start"].apply(parse_event_date)
     df["end"] = df["end"].apply(parse_event_date).fillna(df["start"])
     df = df.dropna(subset=["start"])
@@ -482,7 +503,7 @@ def process_raw_dataframe(df_raw):
 
     for col in ["item_id", "event", "donvi", "location", "support", "nguoi_phu_trach", "nguoi_dang_ky", "email", "approval_opinion", "thanh_phan"]:
         if col not in df.columns: df[col] = ""
-        df[col] = df[col].apply(clean_text)
+        else: df[col] = df[col].astype(str).replace("nan", "").str.strip()
         
     df["donvi_parent"] = df["donvi"].apply(extract_parent_donvi)
     return df
@@ -682,11 +703,19 @@ if menu == "Dashboard":
         if pd.isna(s): continue
         if pd.isna(e): e = s
         
+        event_name_str = clean_text(r.get("event", ""))
+        is_holiday = is_holiday_event(event_name_str)
+        
         has_time = not (s.hour == 0 and s.minute == 0 and e.hour == 0 and e.minute == 0)
         time_label = s.strftime("%H:%M") if has_time else "Cả ngày"
         location = clean_text(r.get("location", ""))
-        title = f"{time_label} - {r['event']}" + (f"\n📍 {location}" if location else "")
-        color = event_color(idx, f"{r.get('event','')}-{s}-{location}")
+        
+        # Tiêu đề sự kiện trên lịch
+        prefix_icon = "🔴 [NGHỈ LỄ] " if is_holiday else ""
+        title = f"{prefix_icon}{time_label} - {event_name_str}" + (f"\n📍 {location}" if location else "")
+        
+        color = event_color(idx, f"{event_name_str}-{s}-{location}", is_holiday=is_holiday)
+        text_color = "#FFFFFF" if is_holiday else "#111827"
         event_raw_data_json_string = r.to_json()
         
         cur_date = s.date()
@@ -706,9 +735,9 @@ if menu == "Dashboard":
                 
             events.append({
                 "title": title, "start": start_str, "end": end_str,
-                "backgroundColor": color, "borderColor": color, "textColor": "#111827",
+                "backgroundColor": color, "borderColor": "#B91C1C" if is_holiday else color, "textColor": text_color,
                 "extendedProps": {
-                    "panel_event_title": clean_text(r.get("event", "")),
+                    "panel_event_title": event_name_str,
                     "panel_donvi": clean_text(r.get("donvi", "")),
                     "panel_location": location,
                     "panel_time_label": panel_time_label,
@@ -831,6 +860,7 @@ elif menu == "Đăng ký":
     st.markdown('<div class="table-title">👥 Thành phần Đại biểu tham dự</div>', unsafe_allow_html=True)
     
     with st.container(border=True):
+        # 1. Ban Giám hiệu
         st.markdown("**1. Ban Giám hiệu**")
         select_all_bgh = st.checkbox("Chọn tất cả Ban Giám hiệu (3 thành viên)", value=False)
         if select_all_bgh:
@@ -841,13 +871,14 @@ elif menu == "Đăng ký":
             )
         else:
             bgh_selected = st.multiselect(
-                "Chọn ít nhất 1 thành viên BGH:",
+                "Chọn từng thành viên BGH:",
                 options=bgh_options_from_onedrive,
                 default=[]
             )
             
         st.markdown("---")
-        st.markdown("**2. Đơn vị thuộc & trực thuộc**")
+        # 2. Lãnh đạo diện rộng
+        st.markdown("**2. Lãnh đạo các đơn vị trực thuộc**")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             chiefs_opt = st.checkbox("Trưởng các đơn vị thuộc và trực thuộc")
@@ -855,14 +886,28 @@ elif menu == "Đăng ký":
             all_leaders_opt = st.checkbox("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)")
 
         st.markdown("---")
-        st.markdown("**3. Thành phần Khác**")
-        other_delegates_txt = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Ban Tổ chức, Thư ký...")
+        # 3. Chọn đơn vị tham dự cụ thể (Tìm kiếm thông minh)
+        st.markdown("**3. Chọn Đơn vị tham dự cụ thể (gõ tìm kiếm)**")
+        selected_custom_donvi = st.multiselect(
+            "Gõ tên để tìm nhanh đơn vị tham dự (Khoa / Phòng / Trung tâm / Bệnh viện):",
+            options=DANH_MUC_DON_VI_THAM_DU,
+            default=[]
+        )
+
+        st.markdown("---")
+        # 4. Thành phần khác
+        st.markdown("**4. Thành phần Khác**")
+        other_delegates_txt = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Ban Tổ chức, Tổ ANTT, Thư ký...")
 
     with st.form("registration_form", clear_on_submit=True):
         f1, f2 = st.columns(2)
         with f1: 
             event_name = st.text_input("Tên sự kiện")
-            donvi_lon = st.selectbox("Đơn vị lớn phụ trách/tổ chức", DANH_MUC_DON_VI_LON)
+            
+            # Mặc định đơn vị là 'P. Hành chính Tổng hợp'
+            default_donvi_idx = DANH_MUC_DON_VI_LON.index("P. Hành chính Tổng hợp") if "P. Hành chính Tổng hợp" in DANH_MUC_DON_VI_LON else 0
+            donvi_lon = st.selectbox("Đơn vị lớn phụ trách/tổ chức", DANH_MUC_DON_VI_LON, index=default_donvi_idx)
+            
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
@@ -906,11 +951,13 @@ elif menu == "Đăng ký":
             with st.spinner("Đang lưu sự kiện..."):
                 donvi_display = f"{donvi_lon} - {bomon_to.strip()}" if bomon_to.strip() else donvi_lon
                 
-                # Gom thành phần tham dự
+                # Tổng hợp danh sách đại biểu tham dự
                 thanh_phan_list = []
                 if bgh_selected: thanh_phan_list.extend(bgh_selected)
                 if chiefs_opt: thanh_phan_list.append("Trưởng các đơn vị thuộc và trực thuộc")
                 if all_leaders_opt: thanh_phan_list.append("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)")
+                if selected_custom_donvi:
+                    thanh_phan_list.append("Đơn vị: " + ", ".join(selected_custom_donvi))
                 if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
                 final_thanh_phan = "\n".join(thanh_phan_list)
 
@@ -924,8 +971,8 @@ elif menu == "Đăng ký":
                     
                     new_row["Số lượng bàn đón tiếp"], new_row["Cần trải khăn bàn hội trường"], new_row["Số lượng lễ tân"], new_row["Số lượng bảng tên (bảng mica)"], new_row["Số lượng bìa ký kết"], new_row["Số lượng nước uống"], new_row["Số phần Teabreak"], new_row["Số lượng hoa để bàn"], new_row["Số lượng hoa để bục phát biểu"], new_row["Số lượng hoa bó để tặng"], new_row["Số lượng quà tặng"], new_row["Số lượng Brochure"], new_row["Số lượng khay bưng"], new_row["Số lượng bandroll, standee cần in và thi công"], new_row["Số lượng Backdrop cần in và thi công"], new_row["Cần chạy bảng điện tử"], new_row["Nội dung chạy bảng điện tử (nếu có)"], new_row["Cần gửi thư mời"], new_row["Các yêu cầu khác (nếu có)"] = support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_khac
                     
+                    # Chỉ gán vào cột duy nhất chuẩn hóa
                     new_row["Thành phần tham dự"] = final_thanh_phan
-                    
                     
                     if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
                         send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), location)
