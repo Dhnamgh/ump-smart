@@ -1,9 +1,6 @@
 [client]
 toolbarMode = "viewer"
 showErrorDetails = false
-[client]
-toolbarMode = "viewer"
-showErrorDetails = false
 
 [server]
 runOnSave = true
