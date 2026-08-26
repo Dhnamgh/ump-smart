@@ -50,7 +50,7 @@ DANH_MUC_DON_VI_LON = [
     "Bệnh viện ĐHYD TPHCM",
     "Phòng khám chuyên khoa RHM",
 
-    # 06 Trung tâm (Đã loại bỏ TT. Phẫu thuật thực nghiệm)
+    # 06 Trung tâm
     "TT. Kiểm chuẩn CL XNYH",
     "TT. Đào tạo NL theo NCXH",
     "TT. Công nghệ thông tin",
@@ -71,6 +71,18 @@ DANH_MUC_DON_VI_LON = [
 # ==============================================================================
 st.markdown("""
 <style>
+/* Ẩn nút điều hướng mặc định của Streamlit trên Mobile */
+[data-testid="stSidebarCollapsedControl"],
+button[aria-label="Open sidebar"],
+button[aria-label="Close sidebar"] {
+    display: none !important;
+}
+header[data-testid="stHeader"] { display: none !important; }
+footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
 /* CSS 3 Nút Menu điều hướng trên cùng */
 .top-nav-grid {
     display: grid;
@@ -121,7 +133,7 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label p {
 html, body { font-family: Arial, sans-serif; font-size: 18px; color: #111827; }
 section[data-testid="stSidebar"] { width: 255px !important; min-width: 255px !important; max-width: 255px !important; }
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
-.block-container { padding-top: 3.5rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
+.block-container { padding-top: 1.5rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
 
 div[data-baseweb="notification"] div, .stAlert p { font-size: 13px !important; line-height: 1.4 !important; }
 h1, h2, h3, h4, h5, h6, .stSubheader, .plotly .gtitle,
@@ -252,7 +264,6 @@ def wrap_label(text, width=26):
     return "<br>".join(lines)
 
 def extract_parent_donvi(donvi_text):
-    """Trích xuất đơn vị lớn chuẩn hóa từ chuỗi Đơn vị"""
     txt = clean_text(donvi_text)
     if not txt: return "Khác"
     if " - " in txt:
@@ -338,7 +349,7 @@ def send_notification_email(event_name, donvi, start_dt, location):
     except Exception: return False
 
 # ==============================================================================
-# 3. KẾT NỐI ONEDRIVE CỐ ĐỊNH /OGSM/EVENT/Danh_sach_su_kien.xlsx
+# 3. KẾT NỐI ONEDRIVE (SỰ KIỆN & UMP_LEADER.XLSX)
 # ==============================================================================
 def get_azure_token():
     azure_cfg = st.secrets["azure_ogsm"]
@@ -350,15 +361,15 @@ def get_azure_token():
     res = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
     return res.get("access_token")
 
-def get_onedrive_file_url():
+def get_onedrive_file_url(file_name="Danh_sach_su_kien.xlsx"):
     onedrive_cfg = st.secrets["onedrive_ogsm"]
     drive_id = onedrive_cfg["drive_id"]
-    return f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/OGSM/EVENT/Danh_sach_su_kien.xlsx:/content"
+    return f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/OGSM/EVENT/{file_name}:/content"
 
 def read_onedrive_excel() -> pd.DataFrame:
     try:
         token = get_azure_token()
-        url = get_onedrive_file_url()
+        url = get_onedrive_file_url("Danh_sach_su_kien.xlsx")
         headers = {"Authorization": f"Bearer {token}"}
         res = requests.get(url, headers=headers)
         if res.status_code == 200:
@@ -370,10 +381,45 @@ def read_onedrive_excel() -> pd.DataFrame:
         st.error(f"❌ Lỗi kết nối OneDrive: {e}")
         return pd.DataFrame()
 
+@st.cache_data(ttl=300)
+def load_ump_leaders():
+    """Tự động đọc file UMP_Leader.xlsx từ /OGSM/EVENT/ trên OneDrive"""
+    try:
+        token = get_azure_token()
+        url = get_onedrive_file_url("UMP_Leader.xlsx")
+        headers = {"Authorization": f"Bearer {token}"}
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            df_leader = pd.read_excel(BytesIO(res.content))
+            for col in ["Nhom_Dai_Bieu", "Hoc_Ham_Hoc_Vi", "Ho_Va_Ten", "Chuc_Vu", "Don_Vi"]:
+                if col in df_leader.columns:
+                    df_leader[col] = df_leader[col].fillna("").astype(str).str.strip()
+            
+            # Tự động ghép chuỗi hiển thị
+            df_leader["display_name"] = df_leader.apply(
+                lambda r: f"{r.get('Hoc_Ham_Hoc_Vi', '')} {r.get('Ho_Va_Ten', '')} - {r.get('Chuc_Vu', '')}".strip(" -"), 
+                axis=1
+            )
+            
+            bgh_df = df_leader[df_leader["Nhom_Dai_Bieu"] == "Ban Giám hiệu"]
+            bgh_list = bgh_df["display_name"].tolist() if not bgh_df.empty else []
+            all_names = df_leader["Ho_Va_Ten"].tolist()
+            return bgh_list, all_names
+    except Exception:
+        pass
+    
+    # Dự phòng mặc định nếu file chưa kịp đọc
+    default_bgh = [
+        "GS.TS. Trần Diệp Tuấn - Hiệu trưởng",
+        "PGS.TS. Nguyễn Văn Chinh - Phó Hiệu trưởng",
+        "PGS.TS. Vương Thị Ngọc Lan - Phó Hiệu trưởng"
+    ]
+    return default_bgh, ["Trần Diệp Tuấn", "Nguyễn Văn Chinh", "Vương Thị Ngọc Lan"]
+
 def save_onedrive_excel(df: pd.DataFrame) -> bool:
     try:
         token = get_azure_token()
-        url = get_onedrive_file_url()
+        url = get_onedrive_file_url("Danh_sach_su_kien.xlsx")
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)
@@ -420,7 +466,8 @@ def process_raw_dataframe(df_raw):
         "Cần gửi thư mời": "support_thu_moi", "Các yêu cầu khác (nếu có)": "support_khac",
         "Id": "item_id", "ID": "item_id", "Thời gian bắt đầu": "submitted_at", "Thời gian hoàn thành": "completed_at",
         "Người phụ trách": "nguoi_phu_trach", "Người đăng ký": "nguoi_dang_ky", "Email": "email",
-        "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)": "approval_opinion"
+        "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)": "approval_opinion",
+        "Thành phần tham dự": "thanh_phan", "Đại biểu tham dự": "thanh_phan"
     })
 
     df["start"] = df["start"].apply(parse_event_date)
@@ -571,6 +618,7 @@ def build_detailed_support_table_html(raw_data):
 # 4. KHỞI TẠO STATE & KHAI BÁO MENU
 # ==============================================================================
 df = load_data()
+bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
 today = datetime.today()
 
 if "selected_event_details" not in st.session_state:
@@ -629,7 +677,6 @@ if menu == "Dashboard":
 
     events, event_dates_for_stats = [], []
     
-    # Vòng lặp tách sự kiện qua nhiều ngày
     for idx, (_, r) in enumerate(df_dash.sort_values("start").iterrows()):
         s, e = r["start"], r["end"]
         if pd.isna(s): continue
@@ -780,6 +827,37 @@ elif menu == "Đăng ký":
         end_time = st.time_input("Giờ kết thúc", value=default_end)
     support_flag = st.selectbox("Có yêu cầu hỗ trợ?", ["KHÔNG", "CÓ"], key="reg_support_flag")
 
+    # ================= KHUNG CHỌN ĐẠI BIỂU THAM DỰ TINH GỌN =================
+    st.markdown('<div class="table-title">👥 Thành phần Đại biểu tham dự</div>', unsafe_allow_html=True)
+    
+    with st.container(border=True):
+        st.markdown("**1. Ban Giám hiệu**")
+        select_all_bgh = st.checkbox("Chọn tất cả Ban Giám hiệu (3 thành viên)", value=False)
+        if select_all_bgh:
+            bgh_selected = st.multiselect(
+                "Danh sách BGH tham dự:",
+                options=bgh_options_from_onedrive,
+                default=bgh_options_from_onedrive
+            )
+        else:
+            bgh_selected = st.multiselect(
+                "Chọn ít nhất 1 thành viên BGH:",
+                options=bgh_options_from_onedrive,
+                default=[]
+            )
+            
+        st.markdown("---")
+        st.markdown("**2. Đơn vị thuộc & trực thuộc**")
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            chiefs_opt = st.checkbox("Trưởng các đơn vị thuộc và trực thuộc")
+        with col_c2:
+            all_leaders_opt = st.checkbox("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)")
+
+        st.markdown("---")
+        st.markdown("**3. Thành phần Khác**")
+        other_delegates_txt = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Ban Tổ chức, Thư ký...")
+
     with st.form("registration_form", clear_on_submit=True):
         f1, f2 = st.columns(2)
         with f1: 
@@ -792,13 +870,6 @@ elif menu == "Đăng ký":
             nguoi_phu_trach = st.text_input("Người phụ trách")
             nguoi_dang_ky = st.text_input("Người đăng ký")
             email = st.text_input("Email")
-        
-        # Ô nhập Thành phần tham dự
-        thanh_phan = st.text_area(
-            "Thành phần tham dự:",
-            placeholder="Ví dụ:\n- Ban Giám hiệu ĐHYD\n- Trưởng, Phó trưởng các phòng chức năng...",
-            height=100
-        )
         
         support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_khac = 0, "KHÔNG", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "", "KHÔNG", "", "KHÔNG", ""
         if support_flag == "CÓ":
@@ -835,6 +906,14 @@ elif menu == "Đăng ký":
             with st.spinner("Đang lưu sự kiện..."):
                 donvi_display = f"{donvi_lon} - {bomon_to.strip()}" if bomon_to.strip() else donvi_lon
                 
+                # Gom thành phần tham dự
+                thanh_phan_list = []
+                if bgh_selected: thanh_phan_list.extend(bgh_selected)
+                if chiefs_opt: thanh_phan_list.append("Trưởng các đơn vị thuộc và trực thuộc")
+                if all_leaders_opt: thanh_phan_list.append("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)")
+                if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
+                final_thanh_phan = "\n".join(thanh_phan_list)
+
                 df_excel = read_onedrive_excel()
                 if df_excel.empty: st.error("Không thể kết nối đọc file OneDrive!")
                 else:
@@ -845,7 +924,8 @@ elif menu == "Đăng ký":
                     
                     new_row["Số lượng bàn đón tiếp"], new_row["Cần trải khăn bàn hội trường"], new_row["Số lượng lễ tân"], new_row["Số lượng bảng tên (bảng mica)"], new_row["Số lượng bìa ký kết"], new_row["Số lượng nước uống"], new_row["Số phần Teabreak"], new_row["Số lượng hoa để bàn"], new_row["Số lượng hoa để bục phát biểu"], new_row["Số lượng hoa bó để tặng"], new_row["Số lượng quà tặng"], new_row["Số lượng Brochure"], new_row["Số lượng khay bưng"], new_row["Số lượng bandroll, standee cần in và thi công"], new_row["Số lượng Backdrop cần in và thi công"], new_row["Cần chạy bảng điện tử"], new_row["Nội dung chạy bảng điện tử (nếu có)"], new_row["Cần gửi thư mời"], new_row["Các yêu cầu khác (nếu có)"] = support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_khac
                     
-                    new_row["thanh_phan"] = thanh_phan.strip()
+                    new_row["Thành phần tham dự"] = final_thanh_phan
+                    new_row["thanh_phan"] = final_thanh_phan
                     
                     if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
                         send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), location)
@@ -865,9 +945,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             summary = summary.sort_values("Sự kiện", ascending=True)
             summary["Đơn vị"] = summary["donvi_parent"].apply(lambda x: wrap_label(x, 26))
             
-            # Tự động co giãn chiều cao biểu đồ không bị đè chữ
             chart_height = max(400, len(summary) * 35)
-            
             fig = px.bar(
                 summary, 
                 x="Sự kiện", 
@@ -895,9 +973,33 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         conf = []
         for i, j in [(i, j) for i in range(len(warn_df)) for j in range(i+1, len(warn_df))]:
             a, b = warn_df.iloc[i], warn_df.iloc[j]
+            # Giao thoa thời gian
             if a["start"] < b["end"] and b["start"] < a["end"]:
-                conf.append({"Thời gian": a["start"].strftime("%d/%m/%Y %H:%M"), "Sự kiện 1": clean_text(a["event"]), "Sự kiện 2": clean_text(b["event"]), "Mức độ": "Trùng địa điểm" if clean_text(a["location"]).lower() == clean_text(b["location"]).lower() else "Trùng giờ"})
-        if not conf: st.success(f"{label} không trùng lịch.")
+                a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
+                
+                # Quét trùng nhân sự BGH
+                trung_nguoi = []
+                for name in leader_names_to_check:
+                    if name in a_tp and name in b_tp:
+                        trung_nguoi.append(name)
+                
+                # Quét trùng diện rộng
+                if "Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp:
+                    trung_nguoi.append("Trưởng các đơn vị")
+                if "Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp:
+                    trung_nguoi.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
+
+                muc_do = "Trùng địa điểm" if clean_text(a["location"]).lower() == clean_text(b["location"]).lower() else "Trùng giờ"
+                if trung_nguoi:
+                    muc_do += f" | 👥 Trùng đại biểu: {', '.join(trung_nguoi)}"
+
+                conf.append({
+                    "Thời gian": a["start"].strftime("%d/%m/%Y %H:%M"),
+                    "Sự kiện 1": clean_text(a["event"]),
+                    "Sự kiện 2": clean_text(b["event"]),
+                    "Chi tiết xung đột": muc_do
+                })
+        if not conf: st.success(f"✅ {label} không phát hiện trùng lịch.")
         else: show_table_with_download(f"{label}", pd.DataFrame(conf), f"cb_{period}.xlsx", compact=True)
         
     elif menu == "Hỗ trợ":
