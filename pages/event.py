@@ -704,10 +704,15 @@ st.sidebar.write("✅ Đang chọn:", ", ".join(selected))
 df_f = df if "Toàn trường" in selected or df.empty else df[df["donvi_parent"].isin(selected)]
 
 def enforce_menu_access(menu_name):
-    if menu_name in ["Dashboard", "Liên hệ"]: return True
+    # Chỉ yêu cầu mật khẩu cho Đăng ký và Phê duyệt, các tab khác cho phép truy cập tự do
+    if menu_name not in ["Đăng ký", "Phê duyệt"]:
+        return True
+    
     pwd_key = "admin" if menu_name == "Phê duyệt" else "user"
     state_key = f"{pwd_key}_logged_in"
-    if st.session_state.get(state_key, False): return True
+    if st.session_state.get(state_key, False):
+        return True
+        
     st.warning(f"Khu vực này yêu cầu mật khẩu {pwd_key.upper()}.")
     pwd = st.text_input("Nhập mật khẩu", type="password", key=f"{pwd_key}_pwd")
     if st.button("Đăng nhập", key=f"{pwd_key}_btn"):
@@ -715,7 +720,8 @@ def enforce_menu_access(menu_name):
         if pwd == correct_pwd and correct_pwd != "":
             st.session_state[state_key] = True
             st.rerun()
-        else: st.error("Mật khẩu không chính xác!")
+        else:
+            st.error("Mật khẩu không chính xác!")
     return False
 
 # ==============================================================================
@@ -1006,8 +1012,7 @@ elif menu == "Đăng ký":
 
 # --- BÁO CÁO & CẢNH BÁO & HỖ TRỢ & TRUY VẤN AI ---
 elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
-    if not enforce_menu_access(menu): st.stop()
-    
+        
     if menu == "Báo cáo":
         st.markdown('<div class="table-title">📊 Báo cáo thống kê</div>', unsafe_allow_html=True)
         report_period = st.radio("Kỳ báo cáo", ["Tuần", "Tháng", "Năm"], horizontal=True, label_visibility="collapsed")
