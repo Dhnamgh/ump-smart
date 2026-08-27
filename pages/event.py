@@ -1155,8 +1155,8 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             show_table_with_download(f"Bảng kê chi tiết các xung đột ({label})", pd.DataFrame(conf), f"cb_{label}.xlsx", compact=True)
             
             st.markdown("---")
-            # ================= 2. SO SÁNH & ĐIỀU CHỈNH SỰ KIỆN =================
-            st.markdown('<div class="table-title">🛠️ Đối chiếu & Điều chỉnh để gỡ bỏ trùng lặp</div>', unsafe_allow_html=True)
+            # ================= 2. SO SÁNH & ĐIỀU CHỈNH / XÓA SỰ KIỆN =================
+            st.markdown('<div class="table-title">🛠️ Đối chiếu, Điều chỉnh hoặc Xóa sự kiện trùng</div>', unsafe_allow_html=True)
             
             conflict_df = df_f[df_f["item_id"].astype(str).str.strip().isin(conflicted_event_ids)].drop_duplicates(subset=["item_id"]).copy()
             
@@ -1165,13 +1165,13 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     f"ID {r.get('item_id')} - {r.get('event')} ({r.get('start').strftime('%d/%m/%Y %H:%M') if pd.notna(r.get('start')) else ''}) | {r.get('donvi')}" 
                     for _, r in conflict_df.iterrows()
                 ]
-                selected_event_opt = st.selectbox("👉 Chọn sự kiện cần điều chỉnh:", event_options)
+                selected_event_opt = st.selectbox("👉 Chọn sự kiện cần xử lý (Sửa hoặc Xóa):", event_options)
                 selected_id = selected_event_opt.split(" - ")[0].replace("ID ", "").strip()
                 
                 row_edit = conflict_df[conflict_df["item_id"].astype(str).str.strip() == selected_id].iloc[0]
                 
                 with st.container(border=True):
-                    st.markdown(f"##### 📝 Đang điều chỉnh Sự kiện: `{row_edit.get('event')}` (ID: {selected_id})")
+                    st.markdown(f"##### 📝 Đang chọn Sự kiện: `{row_edit.get('event')}` (ID: {selected_id})")
                     st.caption(f"Đơn vị: **{row_edit.get('donvi')}** | Người đăng ký: **{row_edit.get('nguoi_dang_ky')}**")
                     
                     ec1, ec2 = st.columns(2)
@@ -1187,22 +1187,39 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                         new_location = st.text_input("Địa điểm tổ chức (Đổi địa điểm nếu trùng hội trường/phòng họp):", value=row_edit.get("location", ""), key="edit_loc")
                         new_thanh_phan = st.text_area("Thành phần tham dự (Xóa bớt hoặc đổi tên đại biểu bị trùng):", value=row_edit.get("thanh_phan", ""), height=120, key="edit_tp")
 
-                    if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
-                        with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
-                            df_ex = read_onedrive_excel()
-                            mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
-                            
-                            if mask.any():
-                                df_ex.loc[mask, "Ngày tổ chức"] = new_start_date.strftime("%Y-%m-%d")
-                                df_ex.loc[mask, "Giờ bắt đầu"] = new_start_time.strftime("%H:%M")
-                                df_ex.loc[mask, "Ngày kết thúc"] = new_end_date.strftime("%Y-%m-%d")
-                                df_ex.loc[mask, "Giờ kết thúc"] = new_end_time.strftime("%H:%M")
-                                df_ex.loc[mask, "Địa điểm tổ chức"] = new_location.strip()
-                                df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
+                    btn_c1, btn_c2 = st.columns([1.5, 1])
+                    with btn_c1:
+                        if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
+                            with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
+                                df_ex = read_onedrive_excel()[cite: 1]
+                                mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                 
-                                if save_onedrive_excel(df_ex):
-                                    st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
-                                    st.rerun()
+                                if mask.any():
+                                    df_ex.loc[mask, "Ngày tổ chức"] = new_start_date.strftime("%Y-%m-%d")
+                                    df_ex.loc[mask, "Giờ bắt đầu"] = new_start_time.strftime("%H:%M")
+                                    df_ex.loc[mask, "Ngày kết thúc"] = new_end_date.strftime("%Y-%m-%d")
+                                    df_ex.loc[mask, "Giờ kết thúc"] = new_end_time.strftime("%H:%M")
+                                    df_ex.loc[mask, "Địa điểm tổ chức"] = new_location.strip()
+                                    df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
+                                    
+                                    if save_onedrive_excel(df_ex):[cite: 1]
+                                        st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
+                                        st.rerun()
+
+                    with btn_c2:
+                        with st.expander("🗑️ Tùy chọn Xóa sự kiện"):
+                            confirm_del = st.checkbox(f"Xác nhận xóa hẳn ID {selected_id}", key=f"del_chk_{selected_id}")
+                            if st.button("Xác nhận xóa sự kiện", type="secondary", disabled=not confirm_del):
+                                with st.spinner("Đang xóa sự kiện khỏi OneDrive..."):
+                                    df_ex = read_onedrive_excel()[cite: 1]
+                                    mask_delete = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
+                                    
+                                    if mask_delete.any():
+                                        # Loại bỏ dòng sự kiện cần xóa
+                                        df_new = df_ex[~mask_delete].copy()
+                                        if save_onedrive_excel(df_new):[cite: 1]
+                                            st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
+                                            st.rerun()
         
     elif menu == "Hỗ trợ":
         st.markdown('<div class="table-title">Hỗ trợ</div>', unsafe_allow_html=True)
