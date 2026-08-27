@@ -69,6 +69,21 @@ DANH_MUC_DON_VI_LON = [
 # Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
+# Danh mục địa điểm cố định trọng điểm thường xuyên diễn ra sự kiện
+DANH_MUC_DIA_DIEM_CO_DINH = [
+    "Phòng Hội thảo",
+    "Phòng Hội đồng",
+    "Phòng họp Lầu 1",
+    "Phòng họp Lầu 14",
+    "Đại giảng đường",
+    "Giảng đường 3D",
+    "Giảng đường 3C",
+    "Giảng đường 1",
+    "Giảng đường 2",
+    "Giảng đường AB",
+    "Khác"
+]
+
 # ==============================================================================
 # 1. GIAO DIỆN & CSS (TỐI ƯU TOÀN DIỆN CHO MOBILE RESPONSIVE)
 # ==============================================================================
@@ -208,7 +223,7 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. HÀM TRỢ GIÚP (HELPERS & EMAIL)
+# 2. HÀM TRỢ GIÚP (HELPERS, TEXT NORMALIZATION & EMAIL)
 # ==============================================================================
 def parse_time(text):
     if pd.isna(text): return None
@@ -231,17 +246,101 @@ def clean_text(value):
     if pd.isna(value): return ""
     return str(value).strip()
 
-def normalize_loc(loc_str):
+def remove_vietnamese_accents(text):
+    if not text: return ""
+    text = str(text)
+    patterns = {
+        '[àáảãạăằắẳẵặâầấẩẫậ]': 'a', '[ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬ]': 'a',
+        '[èéẻẽẹêềếểễệ]': 'e', '[ÈÉẺẼẸÊỀẾỂỄỆ]': 'e',
+        '[ìíỉĩị]': 'i', '[ÌÍỈĨỊ]': 'i',
+        '[òóỏõọôồốổỗộơờớởỡợ]': 'o', '[ÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢ]': 'o',
+        '[ùúủũụưừứửữự]': 'u', '[ÙÚỦŨỤƯỪỨỬỮỰ]': 'u',
+        '[ỳýỷỹỵ]': 'y', '[ỲÝỶỸỴ]': 'y',
+        '[đ]': 'd', '[Đ]': 'd'
+    }
+    for regex, replace_char in patterns.items():
+        text = re.sub(regex, replace_char, text)
+    return text
+
+def normalize_location_key(loc_str):
     txt = clean_text(loc_str).lower()
-    txt = re.sub(r"\s+", " ", txt)
-    return txt
+    if not txt or any(online_kw in txt for online_kw in ["trực tuyến", "online", "zoom", "teams", "meet"]):
+        return ""
+    
+    txt = remove_vietnamese_accents(txt)
+    txt = re.sub(r"\s+", " ", txt).strip()
+
+    synonyms = [
+        (r"\b(dai giang duong|dgd|gd lon|giang duong lon)\b", "daigiangduong"),
+        (r"\b(phong hop bgh|hop bgh|bgh)\b", "phonghopbgh"),
+        (r"\b(phong hop hcth|hop hcth)\b", "phonghophcth"),
+        (r"\b(phong hoi thao|hoi thao|p hoi thao)\b", "phonghoithao"),
+        (r"\b(phong hoi dong|hoi dong|p hoi dong)\b", "phonghoidong"),
+        (r"\b(phong hop lau 14|lau 14|hop lau 14)\b", "phonghoplau14"),
+        (r"\b(phong hop lau 1|lau 1|hop lau 1)\b", "phonghoplau1"),
+        (r"\b(giang duong ab|gd ab|ab)\b", "giangduongab"),
+        (r"\b(giang duong 3d|gd 3d|3d)\b", "giangduong3d"),
+        (r"\b(giang duong 3c|gd 3c|3c)\b", "giangduong3c"),
+        (r"\b(giang duong 1|gd 1)\b", "giangduong1"),
+        (r"\b(giang duong 2|gd 2)\b", "giangduong2"),
+    ]
+    for pattern, repl in synonyms:
+        if re.search(pattern, txt):
+            return repl
+
+    noise_words = [
+        r"\blau\s*\d+\b", r"\btang\s*\d+\b", r"\bkhu\s*[a-z0-9]+\b", 
+        r"\bnha\s*[a-z0-9]+\b", r"\bco so\s*\d*\b", r"\bcs\s*\d*\b",
+        r"\bgiang duong\b", r"\bhoi truong\b", r"\bphong hop\b", r"\bphong\b", r"\bgd\b", r"\bht\b"
+    ]
+    for nw in noise_words:
+        txt = re.sub(nw, "", txt)
+
+    return re.sub(r"[^a-zA-Z0-9]", "", txt)
 
 def is_same_location(loc1, loc2):
-    l1 = normalize_loc(loc1)
-    l2 = normalize_loc(loc2)
-    if not l1 or not l2 or l1 in ["trực tuyến", "online", "zoom", "teams"]:
-        return False
-    return (l1 == l2) or (l1 in l2) or (l2 in l1)
+    k1 = normalize_location_key(loc1)
+    k2 = normalize_location_key(loc2)
+    if not k1 or not k2: return False
+    return k1 == k2 or (len(k1) >= 3 and len(k2) >= 3 and (k1 in k2 or k2 in k1))
+
+def normalize_person_name(name_str):
+    txt = remove_vietnamese_accents(clean_text(name_str).lower())
+    titles = [
+        r"\bgs\b", r"\bpgs\b", r"\bts\b", r"\bths\b", r"\bbs\b", 
+        r"\bbsckii\b", r"\bbscki\b", r"\bthay\b", r"\bco\b", 
+        r"\bd\/c\b", r"\bdc\b", r"\bong\b", r"\bba\b"
+    ]
+    for t in titles:
+        txt = re.sub(t, "", txt)
+    txt = re.sub(r"[^a-zA-Z0-9\s]", " ", txt)
+    return re.sub(r"\s+", " ", txt).strip()
+
+def check_delegate_conflict(tp_text_a, tp_text_b, leader_names_list):
+    tp_a = clean_text(tp_text_a)
+    tp_b = clean_text(tp_text_b)
+    if not tp_a or not tp_b: return []
+    
+    conflicts = []
+    for name in leader_names_list:
+        if name in tp_a and name in tp_b:
+            conflicts.append(name)
+            
+    if "Trưởng các đơn vị" in tp_a and "Trưởng các đơn vị" in tp_b:
+        conflicts.append("Trưởng các đơn vị")
+    if "Lãnh đạo các đơn vị" in tp_a and "Lãnh đạo các đơn vị" in tp_b:
+        conflicts.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
+        
+    items_a = [normalize_person_name(x) for x in re.split(r"[\n,;]+", tp_a) if len(normalize_person_name(x)) > 4]
+    items_b = [normalize_person_name(x) for x in re.split(r"[\n,;]+", tp_b) if len(normalize_person_name(x)) > 4]
+    
+    for ia in items_a:
+        for ib in items_b:
+            if ia == ib or (len(ia.split()) >= 2 and ia in ib) or (len(ib.split()) >= 2 and ib in ia):
+                if ia not in [normalize_person_name(c) for c in conflicts]:
+                    conflicts.append(ia.title())
+                    
+    return list(set(conflicts))
 
 def is_holiday_event(event_name):
     txt = clean_text(event_name).lower()
@@ -263,8 +362,7 @@ def count_value(value):
     return 1 if up in ["CÓ", "CO", "YES", "Y", "TRUE"] else 1
 
 def event_color(index, key, is_holiday=False):
-    if is_holiday:
-        return "#EF4444"
+    if is_holiday: return "#EF4444"
     palette = ["#DBEAFE", "#DCFCE7", "#FEE2E2", "#FFEDD5", "#F3E8FF", "#CCFBF1", "#FCE7F3", "#E0E7FF", "#CFFAFE", "#FEF3C7"]
     digest = int(hashlib.md5(str(key).encode("utf-8")).hexdigest(), 16)
     return palette[(digest + index) % len(palette)]
@@ -663,7 +761,10 @@ if not df.empty:
     for i, j in [(i, j) for i in range(len(upcoming_events)) for j in range(i+1, len(upcoming_events))]:
         a, b = upcoming_events.iloc[i], upcoming_events.iloc[j]
         if a["start"] < b["end"] and b["start"] < a["end"]:
-            num_conflicts += 1
+            trung_nguoi = check_delegate_conflict(a.get("thanh_phan", ""), b.get("thanh_phan", ""), leader_names_to_check)
+            is_loc_dup = is_same_location(a.get("location", ""), b.get("location", ""))
+            if is_loc_dup or len(trung_nguoi) > 0:
+                num_conflicts += 1
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
@@ -919,7 +1020,11 @@ elif menu == "Đăng ký":
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
-            location = st.text_input("Địa điểm")
+            dia_diem_select = st.selectbox("Địa điểm tổ chức", DANH_MUC_DIA_DIEM_CO_DINH)
+            dia_diem_khac = ""
+            if dia_diem_select == "Khác":
+                dia_diem_khac = st.text_input("Nhập địa điểm cụ thể (nếu chọn Khác)", placeholder="Ví dụ: Phòng 402 nhà A, Trực tuyến Zoom...")
+            
             nguoi_phu_trach = st.text_input("Người phụ trách")
             nguoi_dang_ky = st.text_input("Người đăng ký")
             email = st.text_input("Email")
@@ -954,7 +1059,9 @@ elif menu == "Đăng ký":
         submitted = st.form_submit_button("Gửi đăng ký")
 
     if submitted:
-        if not event_name or not donvi_lon or not location: st.error("Vui lòng nhập tối thiểu: Tên sự kiện, Đơn vị và Địa điểm.")
+        final_location = dia_diem_khac.strip() if dia_diem_select == "Khác" else dia_diem_select
+        if not event_name or not donvi_lon or not final_location: 
+            st.error("Vui lòng nhập tối thiểu: Tên sự kiện, Đơn vị và Địa điểm.")
         else:
             with st.spinner("Đang lưu sự kiện..."):
                 donvi_display = f"{donvi_lon} - {bomon_to.strip()}" if bomon_to.strip() else donvi_lon
@@ -968,20 +1075,20 @@ elif menu == "Đăng ký":
                 if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
                 final_thanh_phan = "\n".join(thanh_phan_list)
 
-                df_excel = read_onedrive_excel()
+                df_excel = read_onedrive_excel()[cite: 1]
                 if df_excel.empty: st.error("Không thể kết nối đọc file OneDrive!")
                 else:
                     valid_ids = pd.to_numeric(df_excel["Id"], errors="coerce").dropna()
                     next_id = int(valid_ids.max() + 1) if not valid_ids.empty else 1
                     new_row = {col: None for col in df_excel.columns}
-                    new_row["Id"], new_row["Thời gian bắt đầu"], new_row["Email"], new_row["Tên"], new_row["Đơn vị phụ trách/ tổ chức"], new_row["Tên sự kiện"], new_row["Ngày tổ chức"], new_row["Giờ bắt đầu"], new_row["Giờ kết thúc"], new_row["Ngày kết thúc"], new_row["Địa điểm tổ chức"], new_row["Thông tin người phụ trách"], new_row["Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = next_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), email, nguoi_dang_ky, donvi_display, event_name, start_date.strftime("%Y-%m-%d"), start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), end_date.strftime("%Y-%m-%d"), location, nguoi_phu_trach, support_flag
+                    new_row["Id"], new_row["Thời gian bắt đầu"], new_row["Email"], new_row["Tên"], new_row["Đơn vị phụ trách/ tổ chức"], new_row["Tên sự kiện"], new_row["Ngày tổ chức"], new_row["Giờ bắt đầu"], new_row["Giờ kết thúc"], new_row["Ngày kết thúc"], new_row["Địa điểm tổ chức"], new_row["Thông tin người phụ trách"], new_row["Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = next_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), email, nguoi_dang_ky, donvi_display, event_name, start_date.strftime("%Y-%m-%d"), start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), end_date.strftime("%Y-%m-%d"), final_location, nguoi_phu_trach, support_flag
                     
                     new_row["Số lượng bàn đón tiếp"], new_row["Cần trải khăn bàn hội trường"], new_row["Số lượng lễ tân"], new_row["Số lượng bảng tên (bảng mica)"], new_row["Số lượng bìa ký kết"], new_row["Số lượng nước uống"], new_row["Số phần Teabreak"], new_row["Số lượng hoa để bàn"], new_row["Số lượng hoa để bục phát biểu"], new_row["Số lượng hoa bó để tặng"], new_row["Số lượng quà tặng"], new_row["Số lượng Brochure"], new_row["Số lượng khay bưng"], new_row["Số lượng bandroll, standee cần in và thi công"], new_row["Số lượng Backdrop cần in và thi công"], new_row["Cần chạy bảng điện tử"], new_row["Nội dung chạy bảng điện tử (nếu có)"], new_row["Cần gửi thư mời"], new_row["Các yêu cầu khác (nếu có)"] = support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_khac
                     
                     new_row["Thành phần tham dự"] = final_thanh_phan
                     
-                    if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
-                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), location)
+                    if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):[cite: 1]
+                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), final_location)
                         st.session_state["approval_msg"] = f"🎉 Đăng ký thành công ID {next_id}! Đợi duyệt. Kết quả sẽ hiện trên Dashboard Lịch sau khi duyệt."
                         st.rerun()
 
@@ -1050,7 +1157,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         
         count_loc_conflict = 0
         count_delegate_conflict = 0
-        count_time_only_conflict = 0
         
         warn_df = warn_df.sort_values("start").reset_index(drop=True)
         
@@ -1062,70 +1168,50 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                 overlap_end = min(a["end"], b["end"])
                 
                 if overlap_start < overlap_end:
-                    a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
-                    
-                    trung_nguoi = []
-                    for name in leader_names_to_check:
-                        if name in a_tp and name in b_tp:
-                            trung_nguoi.append(name)
-                    
-                    if "Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp:
-                        trung_nguoi.append("Trưởng các đơn vị")
-                    if "Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp:
-                        trung_nguoi.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
-
+                    trung_nguoi = check_delegate_conflict(a.get("thanh_phan", ""), b.get("thanh_phan", ""), leader_names_to_check)
                     loc_a = clean_text(a.get("location", ""))
                     loc_b = clean_text(b.get("location", ""))
                     is_loc_dup = is_same_location(loc_a, loc_b)
 
-                    overlap_mins = int((overlap_end - overlap_start).total_seconds() / 60)
-                    a_mins = int((a["end"] - a["start"]).total_seconds() / 60)
-                    b_mins = int((b["end"] - b["start"]).total_seconds() / 60)
-                    
-                    is_full_overlap = (overlap_mins == a_mins and overlap_mins == b_mins)
-                    time_overlap_type = "Trùng toàn bộ giờ" if is_full_overlap else f"Trùng {overlap_mins} phút ({overlap_start.strftime('%H:%M')} - {overlap_end.strftime('%H:%M')})"
+                    # Chỉ ghi nhận xung đột nếu TRÙNG ĐỊA ĐIỂM hoặc TRÙNG ĐẠI BIỂU
+                    if is_loc_dup or len(trung_nguoi) > 0:
+                        overlap_mins = int((overlap_end - overlap_start).total_seconds() / 60)
+                        time_overlap_type = f"Trùng {overlap_mins} phút ({overlap_start.strftime('%H:%M')} - {overlap_end.strftime('%H:%M')})"
 
-                    reasons = []
-                    if is_loc_dup:
-                        reasons.append(f"📍 Trùng địa điểm ({loc_a})")
-                        count_loc_conflict += 1
-                    if trung_nguoi:
-                        reasons.append(f"👥 Trùng đại biểu: {', '.join(trung_nguoi)}")
-                        count_delegate_conflict += 1
-                    if not is_loc_dup and not trung_nguoi:
-                        reasons.append(f"🕒 {time_overlap_type}")
-                        count_time_only_conflict += 1
-                    else:
+                        reasons = []
+                        if is_loc_dup:
+                            reasons.append(f"📍 Trùng địa điểm ({loc_a})")
+                            count_loc_conflict += 1
+                        if trung_nguoi:
+                            reasons.append(f"👥 Trùng đại biểu: {', '.join(trung_nguoi)}")
+                            count_delegate_conflict += 1
                         reasons.append(f"🕒 {time_overlap_type}")
 
-                    conf.append({
-                        "Ngày": a["start"].strftime("%d/%m/%Y"),
-                        "ID 1": str(a.get("item_id", "")),
-                        "Sự kiện 1": f"{a.get('event')} ({a.get('donvi')}) [{a['start'].strftime('%H:%M')}-{a['end'].strftime('%H:%M')}]",
-                        "ID 2": str(b.get("item_id", "")),
-                        "Sự kiện 2": f"{b.get('event')} ({b.get('donvi')}) [{b['start'].strftime('%H:%M')}-{b['end'].strftime('%H:%M')}]",
-                        "Chi tiết xung đột": " | ".join(reasons)
-                    })
-                    conflicted_event_ids.add(str(a.get("item_id", "")).strip())
-                    conflicted_event_ids.add(str(b.get("item_id", "")).strip())
+                        conf.append({
+                            "Ngày": a["start"].strftime("%d/%m/%Y"),
+                            "ID 1": str(a.get("item_id", "")),
+                            "Sự kiện 1": f"{a.get('event')} ({a.get('donvi')}) [{a['start'].strftime('%H:%M')}-{a['end'].strftime('%H:%M')}]",
+                            "ID 2": str(b.get("item_id", "")),
+                            "Sự kiện 2": f"{b.get('event')} ({b.get('donvi')}) [{b['start'].strftime('%H:%M')}-{b['end'].strftime('%H:%M')}]",
+                            "Chi tiết xung đột": " | ".join(reasons)
+                        })
+                        conflicted_event_ids.add(str(a.get("item_id", "")).strip())
+                        conflicted_event_ids.add(str(b.get("item_id", "")).strip())
                 
         if not conf:
-            st.success(f"✅ {label} không phát hiện trùng lịch.")
+            st.success(f"✅ {label} không phát hiện xung đột lịch (Các sự kiện trùng giờ đều khác địa điểm và khác đại biểu tham dự).")
         else:
             st.markdown(f"##### 📊 Thống kê mức độ xung đột ({label})")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Tổng cặp xung đột", len(conf))
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Tổng cặp xung đột cần xử lý", len(conf))
             m2.metric("📍 Trùng Địa điểm", count_loc_conflict)
             m3.metric("👥 Trùng Đại biểu", count_delegate_conflict)
-            m4.metric("🕒 Trùng Khung giờ", count_time_only_conflict)
             
             show_table_with_download(f"Bảng kê chi tiết các xung đột ({label})", pd.DataFrame(conf), f"cb_{label}.xlsx", compact=True)
             
             st.markdown("---")
-            # ================= 2. KHU VỰC XỬ LÝ (YÊU CẦU MẬT KHẨU ADMIN) =================
             st.markdown('<div class="table-title">🛠️ Đối chiếu, Điều chỉnh hoặc Xóa sự kiện trùng</div>', unsafe_allow_html=True)
             
-            # Kiểm tra trạng thái đăng nhập admin
             is_admin = st.session_state.get("admin_logged_in", False)
             
             if not is_admin:
@@ -1167,14 +1253,23 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                             
                         with ec2:
                             st.markdown("**📍 Địa điểm & 👥 Thành phần:**")
-                            new_location = st.text_input("Địa điểm tổ chức (Đổi địa điểm nếu trùng hội trường/phòng họp):", value=row_edit.get("location", ""), key="edit_loc")
+                            current_loc = row_edit.get("location", "")
+                            loc_idx = DANH_MUC_DIA_DIEM_CO_DINH.index(current_loc) if current_loc in DANH_MUC_DIA_DIEM_CO_DINH else (len(DANH_MUC_DIA_DIEM_CO_DINH) - 1)
+                            
+                            edit_loc_select = st.selectbox("Địa điểm tổ chức mới", DANH_MUC_DIA_DIEM_CO_DINH, index=loc_idx, key="edit_loc_sel")
+                            edit_loc_custom = ""
+                            if edit_loc_select == "Khác":
+                                edit_loc_custom = st.text_input("Nhập địa điểm cụ thể", value=current_loc if current_loc not in DANH_MUC_DIA_DIEM_CO_DINH else "", key="edit_loc_custom")
+                                
                             new_thanh_phan = st.text_area("Thành phần tham dự (Xóa bớt hoặc đổi tên đại biểu bị trùng):", value=row_edit.get("thanh_phan", ""), height=120, key="edit_tp")
+
+                        final_edit_location = edit_loc_custom.strip() if edit_loc_select == "Khác" else edit_loc_select
 
                         btn_c1, btn_c2 = st.columns([1.5, 1])
                         with btn_c1:
                             if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
                                 with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
-                                    df_ex = read_onedrive_excel()
+                                    df_ex = read_onedrive_excel()[cite: 1]
                                     mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                     
                                     if mask.any():
@@ -1182,10 +1277,10 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                         df_ex.loc[mask, "Giờ bắt đầu"] = new_start_time.strftime("%H:%M")
                                         df_ex.loc[mask, "Ngày kết thúc"] = new_end_date.strftime("%Y-%m-%d")
                                         df_ex.loc[mask, "Giờ kết thúc"] = new_end_time.strftime("%H:%M")
-                                        df_ex.loc[mask, "Địa điểm tổ chức"] = new_location.strip()
+                                        df_ex.loc[mask, "Địa điểm tổ chức"] = final_edit_location
                                         df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
                                         
-                                        if save_onedrive_excel(df_ex):
+                                        if save_onedrive_excel(df_ex):[cite: 1]
                                             st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
                                             st.rerun()
 
@@ -1194,12 +1289,12 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                 confirm_del = st.checkbox(f"Xác nhận xóa hẳn ID {selected_id}", key=f"del_chk_{selected_id}")
                                 if st.button("Xác nhận xóa sự kiện", type="secondary", disabled=not confirm_del):
                                     with st.spinner("Đang xóa sự kiện khỏi OneDrive..."):
-                                        df_ex = read_onedrive_excel()
+                                        df_ex = read_onedrive_excel()[cite: 1]
                                         mask_delete = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                         
                                         if mask_delete.any():
                                             df_new = df_ex[~mask_delete].copy()
-                                            if save_onedrive_excel(df_new):
+                                            if save_onedrive_excel(df_new):[cite: 1]
                                                 st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                                 st.rerun()
         
@@ -1244,12 +1339,12 @@ elif menu == "Phê duyệt":
             
             if st.button("✅ PHÊ DUYỆT TẤT CẢ", type="primary"):
                 with st.spinner("Đang phê duyệt..."):
-                    df_ex = read_onedrive_excel()
+                    df_ex = read_onedrive_excel()[cite: 1]
                     p_ids = pending_df["item_id"].astype(str).str.strip().tolist()
                     op = "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
                     mask = df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False).isin(p_ids)
                     df_ex.loc[mask, op], df_ex.loc[mask, "Thời gian hoàn thành"] = "Thống nhất", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    if save_onedrive_excel(df_ex): 
+                    if save_onedrive_excel(df_ex):[cite: 1]
                         st.session_state["approval_msg"] = f"🎉 Đã phê duyệt {len(p_ids)} sự kiện! Cập nhật trên Dashboard Lịch."
                         st.rerun()
 
@@ -1264,11 +1359,11 @@ elif menu == "Phê duyệt":
             if st.button("Duyệt sự kiện này"):
                 id_s = str(selected_row["item_id"]).strip()
                 with st.spinner("Đang cập nhật..."):
-                    df_ex, ap_text, op = read_onedrive_excel(), opinion if not reason else f"{opinion}: {reason}", "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
+                    df_ex, ap_text, op = read_onedrive_excel(), opinion if not reason else f"{opinion}: {reason}", "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"[cite: 1]
                     mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == id_s) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(id_s, errors="coerce"))
                     if mask.any(): 
                         df_ex.loc[mask, op], df_ex.loc[mask, "Thời gian hoàn thành"] = ap_text, datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    if save_onedrive_excel(df_ex): 
+                    if save_onedrive_excel(df_ex):[cite: 1]
                         st.session_state["approval_msg"] = f"🎉 Đã phê duyệt ID {id_s}: '{opinion}'. Xem trên Dashboard Lịch."
                         st.rerun()
         else: st.success("🎉 Không có sự kiện nào đang chờ phê duyệt.")
