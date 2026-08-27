@@ -1044,52 +1044,149 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         else: st.info(f"Không có dữ liệu {label}.")
         
     elif menu == "Cảnh báo":
-        st.markdown('<div class="table-title">⚠️ Cảnh báo trùng lịch</div>', unsafe_allow_html=True)
-        period = st.radio("Cảnh báo", ["Tuần", "Tháng"], horizontal=True, label_visibility="collapsed")
-        warn_df, label, _, _ = get_period_df(df_f, period)
-        conf = []
-        for i, j in [(i, j) for i in range(len(warn_df)) for j in range(i+1, len(warn_df))]:
-            a, b = warn_df.iloc[i], warn_df.iloc[j]
-            # Giao thoa thời gian
-            if a["start"] < b["end"] and b["start"] < a["end"]:
-                a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
-                
-                # 1. Quét trùng nhân sự BGH & Lãnh đạo
-                trung_nguoi = []
-                for name in leader_names_to_check:
-                    if name in a_tp and name in b_tp:
-                        trung_nguoi.append(name)
-                
-                if "Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp:
-                    trung_nguoi.append("Trưởng các đơn vị")
-                if "Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp:
-                    trung_nguoi.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
-
-                # 2. Quét trùng địa điểm
-                loc_a = clean_text(a.get("location", ""))
-                loc_b = clean_text(b.get("location", ""))
-                is_loc_dup = is_same_location(loc_a, loc_b)
-
-                # 3. Tổng hợp chi tiết loại xung đột
-                conflict_reasons = []
-                if is_loc_dup:
-                    conflict_reasons.append(f"📍 Trùng địa điểm ({loc_a})")
-                if trung_nguoi:
-                    conflict_reasons.append(f"👥 Trùng đại biểu: {', '.join(trung_nguoi)}")
-                if not is_loc_dup and not trung_nguoi:
-                    conflict_reasons.append("🕒 Trùng khung giờ")
-
-                conf.append({
-                    "Thời gian": a["start"].strftime("%d/%m/%Y %H:%M"),
-                    "Sự kiện 1": clean_text(a["event"]),
-                    "Sự kiện 2": clean_text(b["event"]),
-                    "Chi tiết xung đột": " | ".join(conflict_reasons)
-                })
-                
-        if not conf: st.success(f"✅ {label} không phát hiện trùng lịch.")
+        st.markdown('<div class="table-title">⚠️ Thống kê & Xử lý xung đột lịch sự kiện</div>', unsafe_allow_html=True)
+        if "warn_msg" in st.session_state:
+            st.success(st.session_state.pop("warn_msg"))
+            
+        period = st.radio("Kỳ rà soát", ["Tuần", "Tháng", "Toàn bộ"], horizontal=True, label_visibility="collapsed")
+        
+        if period == "Toàn bộ":
+            warn_df, label = df_f.copy(), "Toàn bộ dữ liệu"
         else:
-            st.error(f"⚠️ Phát hiện {len(conf)} xung đột lịch trong {label.lower()}!")
-            show_table_with_download(f"{label}", pd.DataFrame(conf), f"cb_{period}.xlsx", compact=True)
+            warn_df, label, _, _ = get_period_df(df_f, period)
+            
+        conf = []
+        conflicted_event_ids = set()
+        
+        count_loc_conflict = 0
+        count_delegate_conflict = 0
+        count_time_only_conflict = 0
+        
+        # Sắp xếp theo thời gian
+        warn_df = warn_df.sort_values("start").reset_index(drop=True)
+        
+        for i in range(len(warn_df)):
+            for j in range(i + 1, len(warn_df)):
+                a, b = warn_df.iloc[i], warn_df.iloc[j]
+                
+                # Tính giao thoa thời gian (trùng 1 phần hoặc toàn bộ)
+                overlap_start = max(a["start"], b["start"])
+                overlap_end = min(a["end"], b["end"])
+                
+                if overlap_start < overlap_end:
+                    a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
+                    
+                    # 1. Quét trùng nhân sự chi tiết
+                    trung_nguoi = []
+                    for name in leader_names_to_check:
+                        if name in a_tp and name in b_tp:
+                            trung_nguoi.append(name)
+                    
+                    if "Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp:
+                        trung_nguoi.append("Trưởng các đơn vị")
+                    if "Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp:
+                        trung_nguoi.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
+
+                    # 2. Quét trùng địa điểm
+                    loc_a = clean_text(a.get("location", ""))
+                    loc_b = clean_text(b.get("location", ""))
+                    is_loc_dup = is_same_location(loc_a, loc_b)
+
+                    # 3. Phân loại mức độ thời gian
+                    overlap_mins = int((overlap_end - overlap_start).total_seconds() / 60)
+                    a_mins = int((a["end"] - a["start"]).total_seconds() / 60)
+                    b_mins = int((b["end"] - b["start"]).total_seconds() / 60)
+                    
+                    is_full_overlap = (overlap_mins == a_mins and overlap_mins == b_mins)
+                    time_overlap_type = "Trùng toàn bộ giờ" if is_full_overlap else f"Trùng {overlap_mins} phút ({overlap_start.strftime('%H:%M')} - {overlap_end.strftime('%H:%M')})"
+
+                    # 4. Gom chi tiết lý do xung đột & đếm thống kê
+                    reasons = []
+                    if is_loc_dup:
+                        reasons.append(f"📍 Trùng địa điểm ({loc_a})")
+                        count_loc_conflict += 1
+                    if trung_nguoi:
+                        reasons.append(f"👥 Trùng đại biểu: {', '.join(trung_nguoi)}")
+                        count_delegate_conflict += 1
+                    if not is_loc_dup and not trung_nguoi:
+                        reasons.append(f"🕒 {time_overlap_type}")
+                        count_time_only_conflict += 1
+                    else:
+                        reasons.append(f"🕒 {time_overlap_type}")
+
+                    conf.append({
+                        "Ngày": a["start"].strftime("%d/%m/%Y"),
+                        "ID 1": str(a.get("item_id", "")),
+                        "Sự kiện 1": f"{a.get('event')} ({a.get('donvi')}) [{a['start'].strftime('%H:%M')}-{a['end'].strftime('%H:%M')}]",
+                        "ID 2": str(b.get("item_id", "")),
+                        "Sự kiện 2": f"{b.get('event')} ({b.get('donvi')}) [{b['start'].strftime('%H:%M')}-{b['end'].strftime('%H:%M')}]",
+                        "Chi tiết xung đột": " | ".join(reasons)
+                    })
+                    conflicted_event_ids.add(str(a.get("item_id", "")).strip())
+                    conflicted_event_ids.add(str(b.get("item_id", "")).strip())
+                
+        if not conf:
+            st.success(f"✅ {label} không phát hiện trùng lịch.")
+        else:
+            # ================= 1. BẢNG DASHBOARD THỐNG KÊ NHANH =================
+            st.markdown(f"##### 📊 Thống kê mức độ xung đột ({label})")
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Tổng cặp xung đột", len(conf))
+            m2.metric("📍 Trùng Địa điểm", count_loc_conflict)
+            m3.metric("👥 Trùng Đại biểu", count_delegate_conflict)
+            m4.metric("🕒 Trùng Khung giờ", count_time_only_conflict)
+            
+            show_table_with_download(f"Bảng kê chi tiết các xung đột ({label})", pd.DataFrame(conf), f"cb_{period}.xlsx", compact=True)
+            
+            st.markdown("---")
+            # ================= 2. SO SÁNH & ĐIỀU CHỈNH SỰ KIỆN =================
+            st.markdown('<div class="table-title">🛠️ Đối chiếu & Điều chỉnh để gỡ bỏ trùng lặp</div>', unsafe_allow_html=True)
+            
+            conflict_df = df_f[df_f["item_id"].astype(str).str.strip().isin(conflicted_event_ids)].drop_duplicates(subset=["item_id"]).copy()
+            
+            if not conflict_df.empty:
+                event_options = [
+                    f"ID {r.get('item_id')} - {r.get('event')} ({r.get('start').strftime('%d/%m/%Y %H:%M') if pd.notna(r.get('start')) else ''}) | {r.get('donvi')}" 
+                    for _, r in conflict_df.iterrows()
+                ]
+                selected_event_opt = st.selectbox("👉 Chọn sự kiện cần điều chỉnh:", event_options)
+                selected_id = selected_event_opt.split(" - ")[0].replace("ID ", "").strip()
+                
+                row_edit = conflict_df[conflict_df["item_id"].astype(str).str.strip() == selected_id].iloc[0]
+                
+                with st.container(border=True):
+                    st.markdown(f"##### 📝 Đang điều chỉnh Sự kiện: `{row_edit.get('event')}` (ID: {selected_id})")
+                    st.caption(f"Đơn vị: **{row_edit.get('donvi')}** | Người đăng ký: **{row_edit.get('nguoi_dang_ky')}**")
+                    
+                    ec1, ec2 = st.columns(2)
+                    with ec1:
+                        st.markdown("**🕒 Thời gian tổ chức:**")
+                        new_start_date = st.date_input("Ngày tổ chức", value=row_edit["start"].date() if pd.notna(row_edit["start"]) else today.date(), key="edit_sd")
+                        new_start_time = st.time_input("Giờ bắt đầu", value=row_edit["start"].time() if pd.notna(row_edit["start"]) else time(7, 0), key="edit_st")
+                        new_end_date = st.date_input("Ngày kết thúc", value=row_edit["end"].date() if pd.notna(row_edit["end"]) else new_start_date, key="edit_ed")
+                        new_end_time = st.time_input("Giờ kết thúc", value=row_edit["end"].time() if pd.notna(row_edit["end"]) else time(11, 0), key="edit_et")
+                        
+                    with ec2:
+                        st.markdown("**📍 Địa điểm & 👥 Thành phần:**")
+                        new_location = st.text_input("Địa điểm tổ chức (Đổi địa điểm nếu trùng hội trường/phòng họp):", value=row_edit.get("location", ""), key="edit_loc")
+                        new_thanh_phan = st.text_area("Thành phần tham dự (Xóa bớt hoặc đổi tên đại biểu bị trùng):", value=row_edit.get("thanh_phan", ""), height=120, key="edit_tp")
+
+                    if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
+                        with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
+                            df_ex = read_onedrive_excel()
+                            mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
+                            
+                            if mask.any():
+                                df_ex.loc[mask, "Ngày tổ chức"] = new_start_date.strftime("%Y-%m-%d")
+                                df_ex.loc[mask, "Giờ bắt đầu"] = new_start_time.strftime("%H:%M")
+                                df_ex.loc[mask, "Ngày kết thúc"] = new_end_date.strftime("%Y-%m-%d")
+                                df_ex.loc[mask, "Giờ kết thúc"] = new_end_time.strftime("%H:%M")
+                                df_ex.loc[mask, "Địa điểm tổ chức"] = new_location.strip()
+                                df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
+                                
+                                if save_onedrive_excel(df_ex):
+                                    st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
+                                    st.rerun()
         
     elif menu == "Hỗ trợ":
         st.markdown('<div class="table-title">Hỗ trợ</div>', unsafe_allow_html=True)
