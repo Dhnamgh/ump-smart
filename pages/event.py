@@ -1075,7 +1075,7 @@ elif menu == "Đăng ký":
                 if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
                 final_thanh_phan = "\n".join(thanh_phan_list)
 
-                df_excel = read_onedrive_excel()[cite: 1]
+                df_excel = read_onedrive_excel()
                 if df_excel.empty: st.error("Không thể kết nối đọc file OneDrive!")
                 else:
                     valid_ids = pd.to_numeric(df_excel["Id"], errors="coerce").dropna()
@@ -1087,7 +1087,7 @@ elif menu == "Đăng ký":
                     
                     new_row["Thành phần tham dự"] = final_thanh_phan
                     
-                    if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):[cite: 1]
+                    if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
                         send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), final_location)
                         st.session_state["approval_msg"] = f"🎉 Đăng ký thành công ID {next_id}! Đợi duyệt. Kết quả sẽ hiện trên Dashboard Lịch sau khi duyệt."
                         st.rerun()
@@ -1269,7 +1269,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                         with btn_c1:
                             if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
                                 with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
-                                    df_ex = read_onedrive_excel()[cite: 1]
+                                    df_ex = read_onedrive_excel()
                                     mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                     
                                     if mask.any():
@@ -1280,7 +1280,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                         df_ex.loc[mask, "Địa điểm tổ chức"] = final_edit_location
                                         df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
                                         
-                                        if save_onedrive_excel(df_ex):[cite: 1]
+                                        if save_onedrive_excel(df_ex):
                                             st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
                                             st.rerun()
 
@@ -1289,12 +1289,12 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                 confirm_del = st.checkbox(f"Xác nhận xóa hẳn ID {selected_id}", key=f"del_chk_{selected_id}")
                                 if st.button("Xác nhận xóa sự kiện", type="secondary", disabled=not confirm_del):
                                     with st.spinner("Đang xóa sự kiện khỏi OneDrive..."):
-                                        df_ex = read_onedrive_excel()[cite: 1]
+                                        df_ex = read_onedrive_excel()
                                         mask_delete = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                         
                                         if mask_delete.any():
                                             df_new = df_ex[~mask_delete].copy()
-                                            if save_onedrive_excel(df_new):[cite: 1]
+                                            if save_onedrive_excel(df_new):
                                                 st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                                 st.rerun()
         
@@ -1339,12 +1339,12 @@ elif menu == "Phê duyệt":
             
             if st.button("✅ PHÊ DUYỆT TẤT CẢ", type="primary"):
                 with st.spinner("Đang phê duyệt..."):
-                    df_ex = read_onedrive_excel()[cite: 1]
+                    df_ex = read_onedrive_excel()
                     p_ids = pending_df["item_id"].astype(str).str.strip().tolist()
                     op = "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
                     mask = df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False).isin(p_ids)
                     df_ex.loc[mask, op], df_ex.loc[mask, "Thời gian hoàn thành"] = "Thống nhất", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    if save_onedrive_excel(df_ex):[cite: 1]
+                    if save_onedrive_excel(df_ex):
                         st.session_state["approval_msg"] = f"🎉 Đã phê duyệt {len(p_ids)} sự kiện! Cập nhật trên Dashboard Lịch."
                         st.rerun()
 
@@ -1359,11 +1359,11 @@ elif menu == "Phê duyệt":
             if st.button("Duyệt sự kiện này"):
                 id_s = str(selected_row["item_id"]).strip()
                 with st.spinner("Đang cập nhật..."):
-                    df_ex, ap_text, op = read_onedrive_excel(), opinion if not reason else f"{opinion}: {reason}", "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"[cite: 1]
+                    df_ex, ap_text, op = read_onedrive_excel(), opinion if not reason else f"{opinion}: {reason}", "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
                     mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == id_s) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(id_s, errors="coerce"))
                     if mask.any(): 
                         df_ex.loc[mask, op], df_ex.loc[mask, "Thời gian hoàn thành"] = ap_text, datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    if save_onedrive_excel(df_ex):[cite: 1]
+                    if save_onedrive_excel(df_ex):
                         st.session_state["approval_msg"] = f"🎉 Đã phê duyệt ID {id_s}: '{opinion}'. Xem trên Dashboard Lịch."
                         st.rerun()
         else: st.success("🎉 Không có sự kiện nào đang chờ phê duyệt.")
