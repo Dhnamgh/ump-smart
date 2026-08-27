@@ -74,7 +74,6 @@ DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giá
 # ==============================================================================
 st.markdown("""
 <style>
-/* Ẩn nút điều hướng mặc định của Streamlit trên Mobile */
 [data-testid="stSidebarCollapsedControl"],
 button[aria-label="Open sidebar"],
 button[aria-label="Close sidebar"] {
@@ -86,7 +85,6 @@ footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid
     visibility: hidden !important;
 }
 
-/* CSS 3 Nút Menu điều hướng trên cùng */
 .top-nav-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -115,7 +113,6 @@ footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid
     outline: 2px solid #90caf9;
 }
 
-/* CSS Sidebar */
 section[data-testid="stSidebar"] div[role="radiogroup"] { gap: 8px !important; }
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
     width: 170px !important; min-width: 170px !important; max-width: 170px !important;
@@ -132,7 +129,6 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label p {
     color: #ffffff !important; font-size: 15px !important; font-weight: 700 !important; margin: 0 !important; opacity: 1 !important;
 }
 
-/* CSS cơ bản */
 html, body { font-family: Arial, sans-serif; font-size: 18px; color: #111827; }
 section[data-testid="stSidebar"] { width: 255px !important; min-width: 255px !important; max-width: 255px !important; }
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
@@ -158,7 +154,6 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
 .ump-table.compact th, .ump-table.compact td { white-space: nowrap; }
 .ump-table tr:nth-child(even) td { background: #f8fafc; }
 
-/* CSS Panel chi tiết sự kiện khi chọn */
 .event-details-panel {
     background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-top: 14px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -170,7 +165,6 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
 
 .stButton>button { width: auto; font-size: 13px !important; }
 
-/* TỐI ƯU MOBILE */
 @media screen and (max-width: 768px) {
     html, body { font-size: 13px !important; }
     .block-container { padding: 4px !important; }
@@ -202,14 +196,12 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
 }
 </style>
 
-<!-- Thanh điều hướng 3 app trên 1 hàng -->
 <div class="top-nav-grid">
     <a href="./" target="_self" class="top-nav-btn">Điểm danh</a>
     <a href="./event" target="_self" class="top-nav-btn active">Sự kiện</a>
     <a href="./ogsm" target="_self" class="top-nav-btn">OGSM</a>
 </div>
 
-<!-- Tiêu đề Cỡ chữ 16 -->
 <div style="font-size: 16px; font-weight: 700; color: #1f2937; margin: 8px 0 22px 0; text-transform: uppercase; letter-spacing: 0.5px; display: block; clear: both;">
     APP QUẢN LÝ SỰ KIỆN UMP
 </div>
@@ -240,13 +232,11 @@ def clean_text(value):
     return str(value).strip()
 
 def normalize_loc(loc_str):
-    """Chuẩn hóa chuỗi địa điểm để so khớp chính xác"""
     txt = clean_text(loc_str).lower()
     txt = re.sub(r"\s+", " ", txt)
     return txt
 
 def is_same_location(loc1, loc2):
-    """Kiểm tra 2 sự kiện có cùng địa điểm tổ chức hay không"""
     l1 = normalize_loc(loc1)
     l2 = normalize_loc(loc2)
     if not l1 or not l2 or l1 in ["trực tuyến", "online", "zoom", "teams"]:
@@ -658,14 +648,12 @@ if "reg_start_date" not in st.session_state: st.session_state.reg_start_date = t
 if "reg_end_date" not in st.session_state: st.session_state.reg_end_date = today.date()
 if "reg_prev_start_date" not in st.session_state: st.session_state.reg_prev_start_date = st.session_state.reg_start_date
 
-# 1. Tính số lượng sự kiện chờ duyệt
 num_pending = 0
 if not df.empty:
     num_pending = len(df[df.apply(approval_text_from_row, axis=1) == ""])
 
 phe_duyet_label = f"Phê duyệt 🔴 {num_pending}" if num_pending > 0 else "Phê duyệt"
 
-# 2. Tính số lượng xung đột trùng lịch (trong vòng 30 ngày tới)
 num_conflicts = 0
 if not df.empty:
     now_ts = datetime.now()
@@ -675,14 +663,7 @@ if not df.empty:
     for i, j in [(i, j) for i in range(len(upcoming_events)) for j in range(i+1, len(upcoming_events))]:
         a, b = upcoming_events.iloc[i], upcoming_events.iloc[j]
         if a["start"] < b["end"] and b["start"] < a["end"]:
-            a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
-            has_delegate_conflict = any(name in a_tp and name in b_tp for name in leader_names_to_check)
-            has_broad_conflict = ("Trưởng các đơn vị" in a_tp and "Trưởng các đơn vị" in b_tp) or \
-                                 ("Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp)
-            has_loc_conflict = is_same_location(a.get("location", ""), b.get("location", ""))
-            
-            if has_loc_conflict or has_delegate_conflict or has_broad_conflict or (a["start"] < b["end"] and b["start"] < a["end"]):
-                num_conflicts += 1
+            num_conflicts += 1
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
@@ -696,7 +677,6 @@ elif selected_menu.startswith("Cảnh báo"):
 else:
     menu = selected_menu
 
-# Danh sách lọc đơn vị lớn ở sidebar
 donvi_parent_list = sorted([d for d in df["donvi_parent"].dropna().unique() if d]) if not df.empty else []
 selected = st.sidebar.multiselect("Chọn đơn vị", ["Toàn trường"] + list(donvi_parent_list), default=["Toàn trường"])
 st.sidebar.write("✅ Đang chọn:", ", ".join(selected))
@@ -704,15 +684,11 @@ st.sidebar.write("✅ Đang chọn:", ", ".join(selected))
 df_f = df if "Toàn trường" in selected or df.empty else df[df["donvi_parent"].isin(selected)]
 
 def enforce_menu_access(menu_name):
-    # Chỉ yêu cầu mật khẩu cho Đăng ký và Phê duyệt, các tab khác cho phép truy cập tự do
     if menu_name not in ["Đăng ký", "Phê duyệt"]:
         return True
-    
     pwd_key = "admin" if menu_name == "Phê duyệt" else "user"
     state_key = f"{pwd_key}_logged_in"
-    if st.session_state.get(state_key, False):
-        return True
-        
+    if st.session_state.get(state_key, False): return True
     st.warning(f"Khu vực này yêu cầu mật khẩu {pwd_key.upper()}.")
     pwd = st.text_input("Nhập mật khẩu", type="password", key=f"{pwd_key}_pwd")
     if st.button("Đăng nhập", key=f"{pwd_key}_btn"):
@@ -720,8 +696,7 @@ def enforce_menu_access(menu_name):
         if pwd == correct_pwd and correct_pwd != "":
             st.session_state[state_key] = True
             st.rerun()
-        else:
-            st.error("Mật khẩu không chính xác!")
+        else: st.error("Mật khẩu không chính xác!")
     return False
 
 # ==============================================================================
@@ -1012,7 +987,7 @@ elif menu == "Đăng ký":
 
 # --- BÁO CÁO & CẢNH BÁO & HỖ TRỢ & TRUY VẤN AI ---
 elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
-        
+    
     if menu == "Báo cáo":
         st.markdown('<div class="table-title">📊 Báo cáo thống kê</div>', unsafe_allow_html=True)
         report_period = st.radio("Kỳ báo cáo", ["Tuần", "Tháng", "Năm"], horizontal=True, label_visibility="collapsed")
@@ -1056,7 +1031,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             warn_df, label = df_f.copy(), "Toàn bộ dữ liệu"
         elif period == "Tuần":
             warn_df, label, _, _ = get_period_df(df_f, "Tuần")
-        else: # Chọn Tháng -> Cho phép chọn Tháng và Năm tùy chọn
+        else:
             with c_p2:
                 m_col1, m_col2 = st.columns(2)
                 with m_col1:
@@ -1065,7 +1040,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     current_year = today.year
                     sel_year = st.selectbox("Chọn năm", [current_year - 1, current_year, current_year + 1], index=1)
             
-            # Lọc dữ liệu theo đúng tháng/năm đã chọn
             m_start = datetime(sel_year, sel_month, 1, 0, 0, 0)
             m_end = datetime(sel_year + 1, 1, 1, 0, 0, 0) if sel_month == 12 else datetime(sel_year, sel_month + 1, 1, 0, 0, 0)
             warn_df = df_f[(df_f["start"] >= m_start) & (df_f["start"] < m_end)].copy()
@@ -1078,21 +1052,18 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         count_delegate_conflict = 0
         count_time_only_conflict = 0
         
-        # Sắp xếp theo thời gian
         warn_df = warn_df.sort_values("start").reset_index(drop=True)
         
         for i in range(len(warn_df)):
             for j in range(i + 1, len(warn_df)):
                 a, b = warn_df.iloc[i], warn_df.iloc[j]
                 
-                # Tính giao thoa thời gian
                 overlap_start = max(a["start"], b["start"])
                 overlap_end = min(a["end"], b["end"])
                 
                 if overlap_start < overlap_end:
                     a_tp, b_tp = clean_text(a.get("thanh_phan", "")), clean_text(b.get("thanh_phan", ""))
                     
-                    # 1. Quét trùng nhân sự chi tiết
                     trung_nguoi = []
                     for name in leader_names_to_check:
                         if name in a_tp and name in b_tp:
@@ -1103,12 +1074,10 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     if "Lãnh đạo các đơn vị" in a_tp and "Lãnh đạo các đơn vị" in b_tp:
                         trung_nguoi.append("Lãnh đạo các đơn vị (Trưởng & Phó)")
 
-                    # 2. Quét trùng địa điểm
                     loc_a = clean_text(a.get("location", ""))
                     loc_b = clean_text(b.get("location", ""))
                     is_loc_dup = is_same_location(loc_a, loc_b)
 
-                    # 3. Phân loại mức độ thời gian
                     overlap_mins = int((overlap_end - overlap_start).total_seconds() / 60)
                     a_mins = int((a["end"] - a["start"]).total_seconds() / 60)
                     b_mins = int((b["end"] - b["start"]).total_seconds() / 60)
@@ -1116,7 +1085,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     is_full_overlap = (overlap_mins == a_mins and overlap_mins == b_mins)
                     time_overlap_type = "Trùng toàn bộ giờ" if is_full_overlap else f"Trùng {overlap_mins} phút ({overlap_start.strftime('%H:%M')} - {overlap_end.strftime('%H:%M')})"
 
-                    # 4. Gom chi tiết lý do xung đột & đếm thống kê
                     reasons = []
                     if is_loc_dup:
                         reasons.append(f"📍 Trùng địa điểm ({loc_a})")
@@ -1144,7 +1112,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         if not conf:
             st.success(f"✅ {label} không phát hiện trùng lịch.")
         else:
-            # ================= 1. BẢNG DASHBOARD THỐNG KÊ NHANH =================
             st.markdown(f"##### 📊 Thống kê mức độ xung đột ({label})")
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Tổng cặp xung đột", len(conf))
@@ -1155,7 +1122,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             show_table_with_download(f"Bảng kê chi tiết các xung đột ({label})", pd.DataFrame(conf), f"cb_{label}.xlsx", compact=True)
             
             st.markdown("---")
-            # ================= 2. SO SÁNH & ĐIỀU CHỈNH / XÓA SỰ KIỆN =================
             st.markdown('<div class="table-title">🛠️ Đối chiếu, Điều chỉnh hoặc Xóa sự kiện trùng</div>', unsafe_allow_html=True)
             
             conflict_df = df_f[df_f["item_id"].astype(str).str.strip().isin(conflicted_event_ids)].drop_duplicates(subset=["item_id"]).copy()
@@ -1191,7 +1157,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     with btn_c1:
                         if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
                             with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
-                                df_ex = read_onedrive_excel()[cite: 1]
+                                df_ex = read_onedrive_excel()
                                 mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                 
                                 if mask.any():
@@ -1202,7 +1168,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                     df_ex.loc[mask, "Địa điểm tổ chức"] = new_location.strip()
                                     df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
                                     
-                                    if save_onedrive_excel(df_ex):[cite: 1]
+                                    if save_onedrive_excel(df_ex):
                                         st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
                                         st.rerun()
 
@@ -1211,13 +1177,12 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                             confirm_del = st.checkbox(f"Xác nhận xóa hẳn ID {selected_id}", key=f"del_chk_{selected_id}")
                             if st.button("Xác nhận xóa sự kiện", type="secondary", disabled=not confirm_del):
                                 with st.spinner("Đang xóa sự kiện khỏi OneDrive..."):
-                                    df_ex = read_onedrive_excel()[cite: 1]
+                                    df_ex = read_onedrive_excel()
                                     mask_delete = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
                                     
                                     if mask_delete.any():
-                                        # Loại bỏ dòng sự kiện cần xóa
                                         df_new = df_ex[~mask_delete].copy()
-                                        if save_onedrive_excel(df_new):[cite: 1]
+                                        if save_onedrive_excel(df_new):
                                             st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                             st.rerun()
         
