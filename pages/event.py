@@ -12,106 +12,81 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from io import BytesIO
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="APP QUẢN LÝ SỰ KIỆN UMP", page_icon="📅", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="APP QUẢN LÝ SỰ KIỆN UMP", page_icon="📅", layout="wide")
 
 # Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
 DANH_MUC_DON_VI_LON = [
-    # Lãnh đạo & Tổ chức chính trị - xã hội
-    "Đảng ủy",
-    "Ban Giám hiệu",
-    "Công đoàn",
-    "Đoàn TN - Hội SV",
-    "HĐ Khoa học - Đào tạo",
-
-    # 11 Phòng chức năng
-    "P. Hành chính Tổng hợp",
-    "P. Tổ chức Cán bộ",
-    "P. Hợp tác Quốc tế",
-    "P. Đào tạo Đại học",
-    "P. Công tác Sinh viên",
-    "P. Đào tạo Sau Đại học",
-    "P. Khoa học Công nghệ",
-    "P. Quản trị Giáo tài",
-    "P. Thanh tra - Pháp chế",
-    "P. ĐBCLGD & KT",
-    "P. Kế hoạch Tài chính",
-
-    # 07 Đơn vị đào tạo
-    "Trường Y",
-    "Trường Dược",
-    "Trường ĐD-KTYH",
-    "Khoa Răng Hàm Mặt",
-    "Khoa Y tế Công cộng",
-    "Khoa Y học Cổ truyền",
-    "Khoa Khoa học Cơ bản",
-
-    # 02 Đơn vị Khám, chữa bệnh
-    "Bệnh viện ĐHYD TPHCM",
-    "Phòng khám chuyên khoa RHM",
-
-    # 06 Trung tâm
-    "TT. Kiểm chuẩn CL XNYH",
-    "TT. Đào tạo NL theo NCXH",
-    "TT. Công nghệ thông tin",
-    "TT. KHCN UMP",
-    "TT. Giáo dục Y học",
-    "TT. Y sinh học phân tử",
-
-    # 03 Đơn vị khác
-    "Thư viện",
-    "Ký túc xá",
-    "Tạp chí Y học TPHCM",
-    
-    "Khác"
+    "Đảng ủy", "Ban Giám hiệu", "Công đoàn", "Đoàn TN - Hội SV", "HĐ Khoa học - Đào tạo",
+    "P. Hành chính Tổng hợp", "P. Tổ chức Cán bộ", "P. Hợp tác Quốc tế", "P. Đào tạo Đại học",
+    "P. Công tác Sinh viên", "P. Đào tạo Sau Đại học", "P. Khoa học Công nghệ", "P. Quản trị Giáo tài",
+    "P. Thanh tra - Pháp chế", "P. ĐBCLGD & KT", "P. Kế hoạch Tài chính",
+    "Trường Y", "Trường Dược", "Trường ĐD-KTYH", "Khoa Răng Hàm Mặt", "Khoa Y tế Công cộng",
+    "Khoa Y học Cổ truyền", "Khoa Khoa học Cơ bản", "Bệnh viện ĐHYD TPHCM", "Phòng khám chuyên khoa RHM",
+    "TT. Kiểm chuẩn CL XNYH", "TT. Đào tạo NL theo NCXH", "TT. Công nghệ thông tin",
+    "TT. KHCN UMP", "TT. Giáo dục Y học", "TT. Y sinh học phân tử",
+    "Thư viện", "Ký túc xá", "Tạp chí Y học TPHCM", "Khác"
 ]
 
-# Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
-# Danh mục địa điểm cố định trọng điểm thường xuyên diễn ra sự kiện
 DANH_MUC_DIA_DIEM_CO_DINH = [
-    "Phòng họp BGH",
-    "Phòng Hội thảo",
-    "Phòng Hội đồng",
-    "Phòng họp Lầu 1",
-    "Phòng họp Lầu 14",
-    "Đại giảng đường",
-    "Giảng đường 3D",
-    "Giảng đường 3C",
-    "Giảng đường 1",
-    "Giảng đường 2",
-    "Giảng đường AB",
-    "Khác"
+    "Phòng họp BGH", "Phòng Hội thảo", "Phòng Hội đồng", "Phòng họp Lầu 1", "Phòng họp Lầu 14",
+    "Đại giảng đường", "Giảng đường 3D", "Giảng đường 3C", "Giảng đường 1", "Giảng đường 2", "Giảng đường AB", "Khác"
 ]
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (GIỮ NGUYÊN NÚT MỞ SIDEBAR TRÊN MOBILE)
+# 1. GIAO DIỆN & CSS (CỐ ĐỊNH HOÀN TOÀN NÚT MENU MỞ SIDEBAR)
 # ==============================================================================
 st.markdown("""
 <style>
-/* Giữ Header trong suốt để nút mở Sidebar không bị ẩn */
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    display: block !important;
+/* 1. Ép hiển thị nút mở sidebar trên điện thoại */
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 8px !important;
+    left: 8px !important;
+    z-index: 99999999 !important;
+    background: #0f5c99 !important;
+    color: #ffffff !important;
+    border-radius: 8px !important;
+    width: 38px !important;
+    height: 38px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    opacity: 1 !important;
 }
 
-/* Đảm bảo nút mũi tên / 3 gạch mở menu luôn hiển thị và bấm được trên mobile */
-[data-testid="stSidebarCollapsedControl"],
-button[data-testid="stSidebarCollapseButton"],
-button[aria-label="Open sidebar"],
-button[aria-label="Close sidebar"] {
+[data-testid="stSidebarCollapsedControl"] button {
     display: flex !important;
+    visibility: visible !important;
+    color: #ffffff !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] svg {
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+    display: block !important;
     visibility: visible !important;
 }
 
-/* Chỉ ẩn các nút deploy, toolbar, footer thừa của Streamlit */
+/* Header trong suốt */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 0px !important;
+}
+
 footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {
     display: none !important;
     visibility: hidden !important;
 }
 
-/* 3 Nút chuyển ứng dụng trên đầu trang */
+/* 3 Nút chuyển App trên đầu trang */
 .top-nav-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -184,7 +159,7 @@ section[data-testid="stSidebar"] * { font-size: 13px !important; }
 
 @media screen and (max-width: 768px) {
     html, body { font-size: 13px !important; }
-    .block-container { padding: 4px !important; }
+    .block-container { padding: 4px !important; padding-top: 48px !important; }
     section[data-testid="stSidebar"] { width: 85% !important; }
 
     iframe { max-width: 100% !important; }
@@ -222,6 +197,23 @@ section[data-testid="stSidebar"] * { font-size: 13px !important; }
     APP QUẢN LÝ SỰ KIỆN UMP
 </div>
 """, unsafe_allow_html=True)
+
+# 2. Chèn JavaScript tự động duy trì nút bấm Sidebar trên Mobile
+components.html("""
+<script>
+function keepSidebarButtonAlive() {
+    const parentDoc = window.parent.document;
+    const btn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]');
+    if (btn) {
+        btn.style.setProperty('display', 'flex', 'important');
+        btn.style.setProperty('visibility', 'visible', 'important');
+        btn.style.setProperty('opacity', '1', 'important');
+        btn.style.setProperty('z-index', '99999999', 'important');
+    }
+}
+setInterval(keepSidebarButtonAlive, 400);
+</script>
+""", height=0, width=0)
 
 # ==============================================================================
 # 2. HÀM TRỢ GIÚP (HELPERS, TEXT NORMALIZATION & EMAIL)
@@ -734,7 +726,7 @@ def build_detailed_support_table_html(raw_data):
     """
 
 # ==============================================================================
-# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO
+# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO / MENU SIDEBAR
 # ==============================================================================
 df = load_data()
 bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
@@ -770,6 +762,7 @@ if not df.empty:
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
+# Menu Sidebar
 menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, "Hỗ trợ", "Truy vấn AI", phe_duyet_label, "Liên hệ"]
 selected_menu = st.sidebar.radio("", menu_options, label_visibility="collapsed")
 
