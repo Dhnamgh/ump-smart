@@ -13,7 +13,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from io import BytesIO
 
-st.set_page_config(page_title="APP QUẢN LÝ SỰ KIỆN UMP", page_icon="📅", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="APP QUẢN LÝ SỰ KIỆN UMP", page_icon="📅", layout="wide", initial_sidebar_state="auto")
 
 # Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
 DANH_MUC_DON_VI_LON = [
@@ -86,55 +86,26 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
 ]
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (KHẮC PHỤC TRIỆT ĐỂ LỖI NÚT MENU TRÊN MOBILE)
+# 1. GIAO DIỆN & CSS (GIỮ NGUYÊN NÚT MỞ SIDEBAR TRÊN MOBILE)
 # ==============================================================================
 st.markdown("""
 <style>
-/* 1. Đảm bảo Header và Nút Menu Sidebar luôn hiển thị và bấm được */
+/* Giữ Header trong suốt để nút mở Sidebar không bị ẩn */
 header[data-testid="stHeader"] {
-    display: block !important;
-    visibility: visible !important;
     background: transparent !important;
-    z-index: 999999 !important;
-}
-
-[data-testid="stSidebarCollapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    position: fixed !important;
-    top: 12px !important;
-    left: 12px !important;
-    z-index: 9999999 !important;
-    background-color: #0f5c99 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.35) !important;
-    width: 40px !important;
-    height: 40px !important;
-    align-items: center !important;
-    justify-content: center !important;
-    pointer-events: auto !important;
-}
-
-[data-testid="stSidebarCollapsedControl"] button {
-    display: flex !important;
-    visibility: visible !important;
-    color: #ffffff !important;
-    width: 100% !important;
-    height: 100% !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-[data-testid="stSidebarCollapsedControl"] svg {
     display: block !important;
-    visibility: visible !important;
-    fill: #ffffff !important;
-    stroke: #ffffff !important;
-    width: 24px !important;
-    height: 24px !important;
 }
 
-/* Ẩn các nút deploy / status thừa của Streamlit */
+/* Đảm bảo nút mũi tên / 3 gạch mở menu luôn hiển thị và bấm được trên mobile */
+[data-testid="stSidebarCollapsedControl"],
+button[data-testid="stSidebarCollapseButton"],
+button[aria-label="Open sidebar"],
+button[aria-label="Close sidebar"] {
+    display: flex !important;
+    visibility: visible !important;
+}
+
+/* Chỉ ẩn các nút deploy, toolbar, footer thừa của Streamlit */
 footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {
     display: none !important;
     visibility: hidden !important;
@@ -188,7 +159,7 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label p {
 html, body { font-family: Arial, sans-serif; font-size: 18px; color: #111827; }
 section[data-testid="stSidebar"] { width: 260px !important; min-width: 260px !important; }
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
-.block-container { padding-top: 1.2rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
+.block-container { padding-top: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
 
 .table-title { font-size: 16px; font-weight: 800; color: #020617; margin-top: 10px; margin-bottom: 8px; }
 .ump-table-wrap { width: 100%; overflow-x: auto; margin-bottom: 10px; }
@@ -213,7 +184,7 @@ section[data-testid="stSidebar"] * { font-size: 13px !important; }
 
 @media screen and (max-width: 768px) {
     html, body { font-size: 13px !important; }
-    .block-container { padding: 6px !important; padding-top: 10px !important; }
+    .block-container { padding: 4px !important; }
     section[data-testid="stSidebar"] { width: 85% !important; }
 
     iframe { max-width: 100% !important; }
@@ -247,7 +218,7 @@ section[data-testid="stSidebar"] * { font-size: 13px !important; }
     <a href="./ogsm" target="_self" class="top-nav-btn">OGSM</a>
 </div>
 
-<div style="font-size: 16px; font-weight: 700; color: #1f2937; margin: 4px 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+<div style="font-size: 16px; font-weight: 700; color: #1f2937; margin: 4px 0 16px 0; text-transform: uppercase; letter-spacing: 0.5px;">
     APP QUẢN LÝ SỰ KIỆN UMP
 </div>
 """, unsafe_allow_html=True)
@@ -763,14 +734,11 @@ def build_detailed_support_table_html(raw_data):
     """
 
 # ==============================================================================
-# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO / MENU ĐIỀU HƯỚNG
+# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO
 # ==============================================================================
 df = load_data()
 bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
 today = datetime.today()
-
-if "active_tab_name" not in st.session_state:
-    st.session_state.active_tab_name = "Dashboard"
 
 if "selected_event_details" not in st.session_state:
     st.session_state.selected_event_details = None
@@ -802,42 +770,15 @@ if not df.empty:
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
-# Danh mục các menu chính
 menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, "Hỗ trợ", "Truy vấn AI", phe_duyet_label, "Liên hệ"]
+selected_menu = st.sidebar.radio("", menu_options, label_visibility="collapsed")
 
-# Tìm index hiện tại an toàn
-curr_idx = 0
-for idx, opt in enumerate(menu_options):
-    if opt.startswith(st.session_state.active_tab_name):
-        curr_idx = idx
-        break
-
-# Thanh điều hướng chọn Tab nhanh hiển thị trực tiếp trên đầu trang
-col_nav1, col_nav2 = st.columns([1, 2])
-with col_nav1:
-    selected_quick_menu = st.selectbox(
-        "⚡ Chức năng:",
-        menu_options,
-        index=curr_idx,
-        key="mobile_quick_nav_select"
-    )
-
-selected_menu_sidebar = st.sidebar.radio("", menu_options, index=curr_idx, label_visibility="collapsed")
-
-# Đồng bộ giữa Sidebar và thanh chọn trên trang
-if selected_quick_menu != menu_options[curr_idx]:
-    final_selected = selected_quick_menu
-else:
-    final_selected = selected_menu_sidebar
-
-if final_selected.startswith("Phê duyệt"):
+if selected_menu.startswith("Phê duyệt"):
     menu = "Phê duyệt"
-elif final_selected.startswith("Cảnh báo"):
+elif selected_menu.startswith("Cảnh báo"):
     menu = "Cảnh báo"
 else:
-    menu = final_selected
-
-st.session_state.active_tab_name = menu
+    menu = selected_menu
 
 donvi_parent_list = sorted([d for d in df["donvi_parent"].dropna().unique() if d]) if not df.empty else []
 selected = st.sidebar.multiselect("Chọn đơn vị", ["Toàn trường"] + list(donvi_parent_list), default=["Toàn trường"])
