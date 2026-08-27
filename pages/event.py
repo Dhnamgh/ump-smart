@@ -69,8 +69,9 @@ DANH_MUC_DON_VI_LON = [
 # Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
-# Danh mục địa điểm cố định trọng điểm thường xuyên diễn ra sự kiện
+# Danh mục địa điểm cố định trọng điểm thường xuyên diễn ra sự kiện (Đã bổ sung Phòng họp BGH)
 DANH_MUC_DIA_DIEM_CO_DINH = [
+    "Phòng họp BGH",
     "Phòng Hội thảo",
     "Phòng Hội đồng",
     "Phòng họp Lầu 1",
@@ -85,36 +86,42 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
 ]
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (TỐI ƯU TOÀN DIỆN CHO MOBILE RESPONSIVE)
+# 1. GIAO DIỆN & CSS (TỐI ƯU TOÀN DIỆN CHO MOBILE & CỐ ĐỊNH NÚT MENU)
 # ==============================================================================
 st.markdown("""
 <style>
-/* Hiện và làm nổi bật nút mở Sidebar (menu 3 gạch / mũi tên) trên Mobile */
-[data-testid="stSidebarCollapsedControl"],
-button[aria-label="Open sidebar"] {
-    display: block !important;
+/* Cố định nút mở Sidebar trên Mobile để không bị mất */
+[data-testid="stSidebarCollapsedControl"] {
+    display: flex !important;
     visibility: visible !important;
-    z-index: 999999 !important;
+    position: fixed !important;
+    top: 10px !important;
+    left: 10px !important;
+    z-index: 9999999 !important;
+    background-color: #0f5c99 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    width: 38px !important;
+    height: 38px !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
-[data-testid="stSidebarCollapsedControl"] {
-    position: fixed !important;
-    top: 8px !important;
-    left: 8px !important;
-    background: #0f5c99 !important;
-    color: white !important;
-    border-radius: 6px !important;
-    padding: 2px !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+[data-testid="stSidebarCollapsedControl"] button {
+    color: #ffffff !important;
 }
 
 [data-testid="stSidebarCollapsedControl"] svg {
-    fill: white !important;
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+    width: 22px !important;
+    height: 22px !important;
 }
 
 header[data-testid="stHeader"] {
     background: transparent !important;
-    z-index: 100 !important;
+    height: 0px !important;
+    pointer-events: none !important;
 }
 
 footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {
@@ -152,9 +159,8 @@ footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid
 
 section[data-testid="stSidebar"] div[role="radiogroup"] { gap: 8px !important; }
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
-    width: 170px !important; min-width: 170px !important; max-width: 170px !important;
-    min-height: 42px !important; background: #0f5c99 !important; border-radius: 8px !important;
-    padding: 10px 14px !important; margin: 5px 0 !important; border: 1px solid #0b4a7a !important;
+    width: 100% !important; min-height: 42px !important; background: #0f5c99 !important; border-radius: 8px !important;
+    padding: 10px 14px !important; margin: 4px 0 !important; border: 1px solid #0b4a7a !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important; display: flex !important; align-items: center !important;
 }
 section[data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: #0b4a7a !important; }
@@ -167,7 +173,7 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label p {
 }
 
 html, body { font-family: Arial, sans-serif; font-size: 18px; color: #111827; }
-section[data-testid="stSidebar"] { width: 255px !important; min-width: 255px !important; max-width: 255px !important; }
+section[data-testid="stSidebar"] { width: 260px !important; min-width: 260px !important; }
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
 .block-container { padding-top: 1.5rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
 
@@ -204,9 +210,8 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
 
 @media screen and (max-width: 768px) {
     html, body { font-size: 13px !important; }
-    .block-container { padding: 4px !important; padding-top: 40px !important; }
-    section[data-testid="stSidebar"] { width: 85% !important; min-width: 250px !important; }
-    section[data-testid="stSidebar"] div[role="radiogroup"] label { width: 100% !important; min-width: 100% !important; }
+    .block-container { padding: 4px !important; padding-top: 50px !important; }
+    section[data-testid="stSidebar"] { width: 85% !important; }
 
     iframe { max-width: 100% !important; }
     .fc { font-size: 11px !important; }
@@ -239,7 +244,7 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
     <a href="./ogsm" target="_self" class="top-nav-btn">OGSM</a>
 </div>
 
-<div style="font-size: 16px; font-weight: 700; color: #1f2937; margin: 8px 0 22px 0; text-transform: uppercase; letter-spacing: 0.5px; display: block; clear: both;">
+<div style="font-size: 16px; font-weight: 700; color: #1f2937; margin: 4px 0 14px 0; text-transform: uppercase; letter-spacing: 0.5px;">
     APP QUẢN LÝ SỰ KIỆN UMP
 </div>
 """, unsafe_allow_html=True)
@@ -755,11 +760,14 @@ def build_detailed_support_table_html(raw_data):
     """
 
 # ==============================================================================
-# 4. KHỞI TẠO STATE & TÍNH TOÁN SỐ LƯỢNG CẢNH BÁO / PHÊ DUYỆT
+# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO / MENU ĐIỀU HƯỚNG
 # ==============================================================================
 df = load_data()
 bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
 today = datetime.today()
+
+if "active_menu_tab" not in st.session_state:
+    st.session_state.active_menu_tab = "Dashboard"
 
 if "selected_event_details" not in st.session_state:
     st.session_state.selected_event_details = None
@@ -768,12 +776,13 @@ if "reg_start_date" not in st.session_state: st.session_state.reg_start_date = t
 if "reg_end_date" not in st.session_state: st.session_state.reg_end_date = today.date()
 if "reg_prev_start_date" not in st.session_state: st.session_state.reg_prev_start_date = st.session_state.reg_start_date
 
+# 1. Đếm số lượng chờ duyệt
 num_pending = 0
 if not df.empty:
     num_pending = len(df[df.apply(approval_text_from_row, axis=1) == ""])
-
 phe_duyet_label = f"Phê duyệt 🔴 {num_pending}" if num_pending > 0 else "Phê duyệt"
 
+# 2. Đếm số lượng xung đột thực tế
 num_conflicts = 0
 if not df.empty:
     now_ts = datetime.now()
@@ -790,8 +799,17 @@ if not df.empty:
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
+# Danh sách menu chuẩn
 menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, "Hỗ trợ", "Truy vấn AI", phe_duyet_label, "Liên hệ"]
-selected_menu = st.sidebar.radio("", menu_options, label_visibility="collapsed")
+
+# Tìm index hiện tại
+current_idx = 0
+for idx, opt in enumerate(menu_options):
+    if opt.startswith(st.session_state.active_menu_tab):
+        current_idx = idx
+        break
+
+selected_menu = st.sidebar.radio("", menu_options, index=current_idx, label_visibility="collapsed")
 
 if selected_menu.startswith("Phê duyệt"):
     menu = "Phê duyệt"
@@ -799,6 +817,8 @@ elif selected_menu.startswith("Cảnh báo"):
     menu = "Cảnh báo"
 else:
     menu = selected_menu
+
+st.session_state.active_menu_tab = menu
 
 donvi_parent_list = sorted([d for d in df["donvi_parent"].dropna().unique() if d]) if not df.empty else []
 selected = st.sidebar.multiselect("Chọn đơn vị", ["Toàn trường"] + list(donvi_parent_list), default=["Toàn trường"])
