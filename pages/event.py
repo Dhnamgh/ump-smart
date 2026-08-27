@@ -1048,12 +1048,28 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         if "warn_msg" in st.session_state:
             st.success(st.session_state.pop("warn_msg"))
             
-        period = st.radio("Kỳ rà soát", ["Tuần", "Tháng", "Toàn bộ"], horizontal=True, label_visibility="collapsed")
+        c_p1, c_p2 = st.columns([1.2, 2.8])
+        with c_p1:
+            period = st.radio("Kỳ rà soát", ["Tuần", "Tháng", "Toàn bộ"], horizontal=True, label_visibility="collapsed")
         
         if period == "Toàn bộ":
             warn_df, label = df_f.copy(), "Toàn bộ dữ liệu"
-        else:
-            warn_df, label, _, _ = get_period_df(df_f, period)
+        elif period == "Tuần":
+            warn_df, label, _, _ = get_period_df(df_f, "Tuần")
+        else: # Chọn Tháng -> Cho phép chọn Tháng và Năm tùy chọn
+            with c_p2:
+                m_col1, m_col2 = st.columns(2)
+                with m_col1:
+                    sel_month = st.selectbox("Chọn tháng", range(1, 13), index=today.month - 1, format_func=lambda x: f"Tháng {x}")
+                with m_col2:
+                    current_year = today.year
+                    sel_year = st.selectbox("Chọn năm", [current_year - 1, current_year, current_year + 1], index=1)
+            
+            # Lọc dữ liệu theo đúng tháng/năm đã chọn
+            m_start = datetime(sel_year, sel_month, 1, 0, 0, 0)
+            m_end = datetime(sel_year + 1, 1, 1, 0, 0, 0) if sel_month == 12 else datetime(sel_year, sel_month + 1, 1, 0, 0, 0)
+            warn_df = df_f[(df_f["start"] >= m_start) & (df_f["start"] < m_end)].copy()
+            label = f"Tháng {sel_month}/{sel_year}"
             
         conf = []
         conflicted_event_ids = set()
@@ -1069,7 +1085,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             for j in range(i + 1, len(warn_df)):
                 a, b = warn_df.iloc[i], warn_df.iloc[j]
                 
-                # Tính giao thoa thời gian (trùng 1 phần hoặc toàn bộ)
+                # Tính giao thoa thời gian
                 overlap_start = max(a["start"], b["start"])
                 overlap_end = min(a["end"], b["end"])
                 
@@ -1136,7 +1152,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             m3.metric("👥 Trùng Đại biểu", count_delegate_conflict)
             m4.metric("🕒 Trùng Khung giờ", count_time_only_conflict)
             
-            show_table_with_download(f"Bảng kê chi tiết các xung đột ({label})", pd.DataFrame(conf), f"cb_{period}.xlsx", compact=True)
+            show_table_with_download(f"Bảng kê chi tiết các xung đột ({label})", pd.DataFrame(conf), f"cb_{label}.xlsx", compact=True)
             
             st.markdown("---")
             # ================= 2. SO SÁNH & ĐIỀU CHỈNH SỰ KIỆN =================
