@@ -89,12 +89,34 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
 # ==============================================================================
 st.markdown("""
 <style>
+/* Hiện và làm nổi bật nút mở Sidebar (menu 3 gạch / mũi tên) trên Mobile */
 [data-testid="stSidebarCollapsedControl"],
-button[aria-label="Open sidebar"],
-button[aria-label="Close sidebar"] {
-    display: none !important;
+button[aria-label="Open sidebar"] {
+    display: block !important;
+    visibility: visible !important;
+    z-index: 999999 !important;
 }
-header[data-testid="stHeader"] { display: none !important; }
+
+[data-testid="stSidebarCollapsedControl"] {
+    position: fixed !important;
+    top: 8px !important;
+    left: 8px !important;
+    background: #0f5c99 !important;
+    color: white !important;
+    border-radius: 6px !important;
+    padding: 2px !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] svg {
+    fill: white !important;
+}
+
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    z-index: 100 !important;
+}
+
 footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {
     display: none !important;
     visibility: hidden !important;
@@ -182,7 +204,7 @@ div[role="radiogroup"] label, div[data-baseweb="radio"] label, .stRadio label, .
 
 @media screen and (max-width: 768px) {
     html, body { font-size: 13px !important; }
-    .block-container { padding: 4px !important; }
+    .block-container { padding: 4px !important; padding-top: 40px !important; }
     section[data-testid="stSidebar"] { width: 85% !important; min-width: 250px !important; }
     section[data-testid="stSidebar"] div[role="radiogroup"] label { width: 100% !important; min-width: 100% !important; }
 
