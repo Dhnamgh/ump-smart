@@ -125,6 +125,7 @@ SUPPORT_FIELDS_MAP = {
     "support_khay_bung": "Số lượng khay bưng",
     "support_bandroll_standee": "Bandroll/standee in & thi công",
     "support_backdrop": "Backdrop in & thi công",
+    "support_bang_dien_tu": "Chạy bảng điện tử",
     "support_thu_moi": "Cần gửi thư mời",
     "support_khac": "Các yêu cầu khác"
 }
@@ -734,18 +735,7 @@ def build_approval_summary_table(df_input):
     return pd.DataFrame(rows, columns=columns)
 
 def build_support_table_with_status(df_input):
-    """Xây dựng bảng hỗ trợ kèm trạng thái nhận nhiệm vụ, hoàn thành & cảnh báo chậm tiến độ"""
-    support_cols = {
-        "support_ban_don_tiep": "Bàn đón tiếp", "support_khan_ban": "Trải khăn bàn hội trường",
-        "support_le_tan": "Lễ tân", "support_bang_ten": "Bảng tên mica",
-        "support_bia_ky_ket": "Bìa ký kết", "support_nuoc_uong": "Nước uống",
-        "support_teabreak": "Teabreak", "support_hoa_ban": "Hoa để bàn",
-        "support_hoa_buc": "Hoa bục phát biểu", "support_hoa_tang": "Hoa bó tặng",
-        "support_qua_tang": "Quà tặng", "support_brochure": "Brochure",
-        "support_khay_bung": "Khay bưng", "support_bandroll_standee": "Bandroll/standee",
-        "support_backdrop": "Backdrop", "support_thu_moi": "Gửi thư mời", "support_khac": "Yêu cầu khác"
-    }
-    
+    """Xây dựng bảng hỗ trợ kèm hạng mục Chạy bảng điện tử (SL=2) & trạng thái thực hiện"""
     rows = []
     now = datetime.now()
     
@@ -757,9 +747,17 @@ def build_support_table_with_status(df_input):
         start_time = r.get("start")
         
         has_detail = False
-        for col_key, label in support_cols.items():
+        for col_key, label in SUPPORT_FIELDS_MAP.items():
             if col_key in df_input.columns:
-                qty = count_value(r.get(col_key, ""))
+                raw_val = r.get(col_key, "")
+                if col_key == "support_bang_dien_tu":
+                    qty = 2 if is_yes(raw_val) or (clean_text(raw_val) and clean_text(raw_val).upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]) else 0
+                elif col_key in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
+                    txt_val = clean_text(raw_val)
+                    qty = 1 if txt_val and txt_val.upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"] else 0
+                else:
+                    qty = count_value(raw_val)
+                    
                 if qty > 0:
                     has_detail = True
                     status_col = f"status_{col_key}"
@@ -777,6 +775,11 @@ def build_support_table_with_status(df_input):
                             alert_tag = "🚨 Khẩn: Chưa xong (<24h bắt đầu)"
                         elif (start_time - now).total_seconds() < 0:
                             alert_tag = "🔴 Quá hạn hoàn thành"
+                            
+                    extra_note = ""
+                    if col_key == "support_bang_dien_tu":
+                        content_led = clean_text(r.get("Nội dung chạy bảng điện tử (nếu có)", ""))
+                        if content_led: extra_note = f" (Nội dung: {content_led})"
                     
                     rows.append({
                         "ID": item_id,
@@ -784,7 +787,7 @@ def build_support_table_with_status(df_input):
                         "Đơn vị": r.get("donvi", ""),
                         "Ngày giờ": start_time.strftime("%d/%m/%Y %H:%M") if pd.notna(start_time) else "",
                         "Địa điểm": r.get("location", ""),
-                        "Hạng mục": label,
+                        "Hạng mục": f"{label}{extra_note}",
                         "Số lượng": qty,
                         "Trạng thái thực hiện": status_val if status_val else "Chưa nhận nhiệm vụ",
                         "Cảnh báo tiến độ": alert_tag,
@@ -1071,17 +1074,26 @@ if menu == "Dashboard":
                 for col_k, col_label in SUPPORT_FIELDS_MAP.items():
                     if col_k in raw_row_data:
                         val_k = raw_row_data[col_k]
-                        qty_k = count_value(val_k)
-                        if col_k in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
+                        if col_k == "support_bang_dien_tu":
+                            qty_k = 2 if is_yes(val_k) or (clean_text(val_k) and clean_text(val_k).upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]) else 0
+                        elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
                             txt_k = clean_text(val_k)
-                            if txt_k and txt_k.upper() not in ["KHÔNG", "NONE", "N/A"]:
-                                qty_k = 1
+                            qty_k = 1 if txt_k and txt_k.upper() not in ["KHÔNG", "NONE", "N/A"] else 0
+                        else:
+                            qty_k = count_value(val_k)
+                            
                         if qty_k > 0:
                             st_col_k = f"status_{col_k}"
                             st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
+                            
+                            extra_lbl = ""
+                            if col_k == "support_bang_dien_tu":
+                                content_led_val = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
+                                if content_led_val: extra_lbl = f" (Nội dung: {content_led_val})"
+                                
                             cur_support_tasks.append({
                                 "col_key": col_k,
-                                "label": col_label,
+                                "label": f"{col_label}{extra_lbl}",
                                 "qty": qty_k,
                                 "status": st_val_k if st_val_k else "Chưa nhận nhiệm vụ"
                             })
