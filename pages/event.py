@@ -734,6 +734,7 @@ def build_approval_summary_table(df_input):
     return pd.DataFrame(rows, columns=columns)
 
 def build_support_table_with_status(df_input):
+    """Xây dựng bảng hỗ trợ kèm trạng thái nhận nhiệm vụ, hoàn thành & cảnh báo chậm tiến độ"""
     support_cols = {
         "support_ban_don_tiep": "Bàn đón tiếp", "support_khan_ban": "Trải khăn bàn hội trường",
         "support_le_tan": "Lễ tân", "support_bang_ten": "Bảng tên mica",
@@ -1048,117 +1049,114 @@ if menu == "Dashboard":
         details_html += "</div>"
         st.markdown(details_html, unsafe_allow_html=True)
 
-        # Nếu có yêu cầu Hỗ trợ -> Hiển thị Bảng hạng mục & Nút thao tác (Yêu cầu Mật khẩu USER)
+        # Nếu có yêu cầu Hỗ trợ -> BẮT BUỘC ĐĂNG NHẬP USER MỚI HIỂN THỊ HẠNG MỤC
         if is_yes(props['panel_support_text']):
             st.markdown('<div class="table-title">🛠️ Danh sách hạng mục cần hỗ trợ & Trạng thái thực hiện</div>', unsafe_allow_html=True)
             
-            cur_support_tasks = []
-            for col_k, col_label in SUPPORT_FIELDS_MAP.items():
-                if col_k in raw_row_data:
-                    val_k = raw_row_data[col_k]
-                    qty_k = count_value(val_k)
-                    if col_k in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
-                        txt_k = clean_text(val_k)
-                        if txt_k and txt_k.upper() not in ["KHÔNG", "NONE", "N/A"]:
-                            qty_k = 1
-                    if qty_k > 0:
-                        st_col_k = f"status_{col_k}"
-                        st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
-                        cur_support_tasks.append({
-                            "col_key": col_k,
-                            "label": col_label,
-                            "qty": qty_k,
-                            "status": st_val_k if st_val_k else "Chưa nhận nhiệm vụ"
-                        })
-                        
-            if not cur_support_tasks:
-                st_gen_val = clean_text(raw_row_data.get("status_support_general", ""))
-                cur_support_tasks.append({
-                    "col_key": "status_support_general",
-                    "label": "Yêu cầu hỗ trợ chung",
-                    "qty": 1,
-                    "status": st_gen_val if st_gen_val else "Chưa nhận nhiệm vụ"
-                })
-
-            # Kiểm tra phân quyền USER cho thao tác nhận nhiệm vụ trên Dashboard
             is_user_authorized = st.session_state.get("user_logged_in", False)
             
-            dash_st_col1, dash_st_col2 = st.columns([1.8, 2.2])
-            with dash_st_col1:
-                dash_worker_select = st.selectbox("👤 Chọn Người thực hiện:", DANH_MUC_NHAN_SU_HO_TRO, key=f"dash_worker_sel_{ev_id}")
-                dash_worker_custom = ""
-                if dash_worker_select == "Khác":
-                    dash_worker_custom = st.text_input("Nhập tên người thực hiện:", placeholder="VD: Nguyễn Văn A...", key=f"dash_worker_custom_{ev_id}")
-                final_dash_worker = dash_worker_custom.strip() if dash_worker_select == "Khác" else dash_worker_select
-                
-            with dash_st_col2:
-                if not is_user_authorized:
-                    with st.expander("🔑 Đăng nhập mật khẩu USER để thao tác"):
-                        u_pwd_input = st.text_input("Nhập mật khẩu User:", type="password", key=f"pwd_dash_supp_{ev_id}")
-                        if st.button("Xác thực User", key=f"btn_dash_u_auth_{ev_id}"):
-                            if u_pwd_input == st.secrets.get("user", {}).get("password", "") and u_pwd_input != "":
-                                st.session_state["user_logged_in"] = True
-                                st.success("✅ Đã xác thực quyền User thành công!")
-                                st.rerun()
-                            else:
-                                st.error("Mật khẩu User không chính xác!")
-
-            for t_idx, task in enumerate(cur_support_tasks):
-                c_key = task["col_key"]
-                st_f_name = f"status_{c_key}" if not c_key.startswith("status_") else c_key
-                cur_stat_txt = task["status"]
-                is_task_done = "HOÀN THÀNH" in cur_stat_txt.upper()
-                is_task_recv = "ĐÃ NHẬN" in cur_stat_txt.upper()
-                
-                with st.container(border=True):
-                    tc1, tc2, tc3 = st.columns([2.5, 1.8, 1.2])
-                    with tc1:
-                        st.markdown(
-                            f"<div style='font-size: 16px; font-weight: 700; color: #0f172a;'>"
-                            f"👉 Hạng mục: <span style='color: #d97706;'>{task['label']}</span> | "
-                            f"SL: <span style='color: #dc2626;'>{task['qty']}</span>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-                    with tc2:
-                        st.caption("Trạng thái thực hiện:")
-                        if is_task_done:
-                            st.markdown(f"✅ <span style='color:#16a34a; font-weight:700;'>{cur_stat_txt}</span>", unsafe_allow_html=True)
-                        elif is_task_recv:
-                            st.markdown(f"🔵 <span style='color:#2563eb; font-weight:700;'>{cur_stat_txt}</span>", unsafe_allow_html=True)
+            if not is_user_authorized:
+                st.warning("🔒 Vui lòng nhập mật khẩu USER để xem chi tiết các hạng mục cần hỗ trợ và cập nhật tiến độ.")
+                with st.expander("🔑 Đăng nhập mật khẩu USER", expanded=True):
+                    u_pwd_input = st.text_input("Nhập mật khẩu User:", type="password", key=f"pwd_dash_supp_{ev_id}")
+                    if st.button("Xác thực mở khóa", key=f"btn_dash_u_auth_{ev_id}"):
+                        if u_pwd_input == st.secrets.get("user", {}).get("password", "") and u_pwd_input != "":
+                            st.session_state["user_logged_in"] = True
+                            st.success("✅ Đã xác thực thành công!")
+                            st.rerun()
                         else:
-                            st.markdown(f"⚪ <span style='color:#6b7280; font-weight:700;'>Chưa nhận nhiệm vụ</span>", unsafe_allow_html=True)
-                    with tc3:
-                        st.caption("Thao tác:")
-                        if not is_task_recv and not is_task_done:
-                            b_lbl, b_tp, nxt = "👉 Nhận nhiệm vụ", "primary", "NHAN"
-                        elif is_task_recv and not is_task_done:
-                            b_lbl, b_tp, nxt = "✅ Báo hoàn thành", "secondary", "HOAN_THANH"
-                        else:
-                            b_lbl, b_tp, nxt = "↩️ Hoàn tác", "secondary", "RESET"
+                            st.error("Mật khẩu User không chính xác!")
+            else:
+                cur_support_tasks = []
+                for col_k, col_label in SUPPORT_FIELDS_MAP.items():
+                    if col_k in raw_row_data:
+                        val_k = raw_row_data[col_k]
+                        qty_k = count_value(val_k)
+                        if col_k in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
+                            txt_k = clean_text(val_k)
+                            if txt_k and txt_k.upper() not in ["KHÔNG", "NONE", "N/A"]:
+                                qty_k = 1
+                        if qty_k > 0:
+                            st_col_k = f"status_{col_k}"
+                            st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
+                            cur_support_tasks.append({
+                                "col_key": col_k,
+                                "label": col_label,
+                                "qty": qty_k,
+                                "status": st_val_k if st_val_k else "Chưa nhận nhiệm vụ"
+                            })
+                            
+                if not cur_support_tasks:
+                    st_gen_val = clean_text(raw_row_data.get("status_support_general", ""))
+                    cur_support_tasks.append({
+                        "col_key": "status_support_general",
+                        "label": "Yêu cầu hỗ trợ chung",
+                        "qty": 1,
+                        "status": st_gen_val if st_gen_val else "Chưa nhận nhiệm vụ"
+                    })
 
-                        if st.button(b_lbl, key=f"dash_btn_tg_{ev_id}_{c_key}_{t_idx}", type=b_tp, disabled=not is_user_authorized):
-                            if not is_user_authorized:
-                                st.error("Vui lòng mở khóa mật khẩu USER ở khung trên!")
-                            elif not final_dash_worker and nxt != "RESET":
-                                st.error("Vui lòng chọn Người thực hiện ở ô phía trên!")
+                dash_st_col1, _ = st.columns([1.8, 2.2])
+                with dash_st_col1:
+                    dash_worker_select = st.selectbox("👤 Chọn Người thực hiện:", DANH_MUC_NHAN_SU_HO_TRO, key=f"dash_worker_sel_{ev_id}")
+                    dash_worker_custom = ""
+                    if dash_worker_select == "Khác":
+                        dash_worker_custom = st.text_input("Nhập tên người thực hiện:", placeholder="VD: Nguyễn Văn A...", key=f"dash_worker_custom_{ev_id}")
+                    final_dash_worker = dash_worker_custom.strip() if dash_worker_select == "Khác" else dash_worker_select
+
+                for t_idx, task in enumerate(cur_support_tasks):
+                    c_key = task["col_key"]
+                    st_f_name = f"status_{c_key}" if not c_key.startswith("status_") else c_key
+                    cur_stat_txt = task["status"]
+                    is_task_done = "HOÀN THÀNH" in cur_stat_txt.upper()
+                    is_task_recv = "ĐÃ NHẬN" in cur_stat_txt.upper()
+                    
+                    with st.container(border=True):
+                        tc1, tc2, tc3 = st.columns([2.5, 1.8, 1.2])
+                        with tc1:
+                            st.markdown(
+                                f"<div style='font-size: 16px; font-weight: 700; color: #0f172a;'>"
+                                f"👉 Hạng mục: <span style='color: #d97706;'>{task['label']}</span> | "
+                                f"SL: <span style='color: #dc2626;'>{task['qty']}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+                        with tc2:
+                            st.caption("Trạng thái thực hiện:")
+                            if is_task_done:
+                                st.markdown(f"✅ <span style='color:#16a34a; font-weight:700;'>{cur_stat_txt}</span>", unsafe_allow_html=True)
+                            elif is_task_recv:
+                                st.markdown(f"🔵 <span style='color:#2563eb; font-weight:700;'>{cur_stat_txt}</span>", unsafe_allow_html=True)
                             else:
-                                with st.spinner("Đang cập nhật trạng thái..."):
-                                    df_ex = read_onedrive_excel()
-                                    mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
-                                    if mask.any():
-                                        now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-                                        if st_f_name not in df_ex.columns: df_ex[st_f_name] = ""
-                                        if nxt == "NHAN":
-                                            v_save = f"ĐÃ NHẬN: {final_dash_worker} ({now_str})"
-                                        elif nxt == "HOAN_THANH":
-                                            v_save = f"HOÀN THÀNH: {final_dash_worker} ({now_str})"
-                                        else:
-                                            v_save = ""
-                                        df_ex.loc[mask, st_f_name] = v_save
-                                        if save_onedrive_excel(df_ex):
-                                            st.session_state["dash_msg"] = f"🎉 Đã cập nhật mục '{task['label']}' thành công!"
-                                            st.rerun()
+                                st.markdown(f"⚪ <span style='color:#6b7280; font-weight:700;'>Chưa nhận nhiệm vụ</span>", unsafe_allow_html=True)
+                        with tc3:
+                            st.caption("Thao tác:")
+                            if not is_task_recv and not is_task_done:
+                                b_lbl, b_tp, nxt = "👉 Nhận nhiệm vụ", "primary", "NHAN"
+                            elif is_task_recv and not is_task_done:
+                                b_lbl, b_tp, nxt = "✅ Báo hoàn thành", "secondary", "HOAN_THANH"
+                            else:
+                                b_lbl, b_tp, nxt = "↩️ Hoàn tác", "secondary", "RESET"
+
+                            if st.button(b_lbl, key=f"dash_btn_tg_{ev_id}_{c_key}_{t_idx}", type=b_tp):
+                                if not final_dash_worker and nxt != "RESET":
+                                    st.error("Vui lòng chọn Người thực hiện ở ô phía trên!")
+                                else:
+                                    with st.spinner("Đang cập nhật trạng thái..."):
+                                        df_ex = read_onedrive_excel()
+                                        mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
+                                        if mask.any():
+                                            now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                            if st_f_name not in df_ex.columns: df_ex[st_f_name] = ""
+                                            if nxt == "NHAN":
+                                                v_save = f"ĐÃ NHẬN: {final_dash_worker} ({now_str})"
+                                            elif nxt == "HOAN_THANH":
+                                                v_save = f"HOÀN THÀNH: {final_dash_worker} ({now_str})"
+                                            else:
+                                                v_save = ""
+                                            df_ex.loc[mask, st_f_name] = v_save
+                                            if save_onedrive_excel(df_ex):
+                                                st.session_state["dash_msg"] = f"🎉 Đã cập nhật mục '{task['label']}' thành công!"
+                                                st.rerun()
 
         col_act1, col_act2 = st.columns([1, 1.2])
         with col_act1:
