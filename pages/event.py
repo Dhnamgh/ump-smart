@@ -69,7 +69,7 @@ DANH_MUC_DON_VI_LON = [
 # Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
-# Danh mục địa điểm cố định trọng điểm thường xuyên diễn ra sự kiện
+# Danh mục địa điểm cố định trọng điểm (Đã bổ sung 3 địa điểm sân trường mới)
 DANH_MUC_DIA_DIEM_CO_DINH = [
     "Phòng họp BGH",
     "Phòng Hội thảo",
@@ -82,15 +82,38 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
     "Giảng đường 1",
     "Giảng đường 2",
     "Giảng đường AB",
+    "Sân trường 217 khu cột cờ",
+    "Sân trường khu nhà 15 tầng",
+    "Sân thể thao đa năng",
     "Khác"
 ]
 
+SUPPORT_COLS_MAP = {
+    "support_ban_don_tiep": "Số lượng bàn đón tiếp",
+    "support_khan_ban": "Cần trải khăn bàn hội trường",
+    "support_le_tan": "Số lượng lễ tân",
+    "support_bang_ten": "Số lượng bảng tên (bảng mica)",
+    "support_bia_ky_ket": "Số lượng bìa ký kết",
+    "support_nuoc_uong": "Số lượng nước uống",
+    "support_teabreak": "Số phần Teabreak",
+    "support_hoa_ban": "Số lượng hoa để bàn",
+    "support_hoa_buc": "Số lượng hoa để bục phát biểu",
+    "support_hoa_tang": "Số lượng hoa bó để tặng",
+    "support_qua_tang": "Số lượng quà tặng",
+    "support_brochure": "Số lượng Brochure",
+    "support_khay_bung": "Số lượng khay bưng",
+    "support_bandroll_standee": "Số lượng bandroll, standee cần in và thi công",
+    "support_backdrop": "Số lượng Backdrop cần in và thi công",
+    "support_bang_dien_tu": "Cần chạy bảng điện tử",
+    "support_thu_moi": "Cần gửi thư mời",
+    "support_khac": "Các yêu cầu khác (nếu có)"
+}
+
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (DỰA TRÊN CƠ CHẾ NATIVE CHUẨN CỦA CODE GỐC)
+# 1. GIAO DIỆN & CSS (DỰA TRÊN CƠ CHẾ GỐC GIỮ NGUYÊN NÚT SIDEBAR)
 # ==============================================================================
 st.markdown("""
 <style>
-/* 3 Nút chuyển ứng dụng trên đầu trang */
 .top-nav-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -119,7 +142,6 @@ st.markdown("""
     outline: 2px solid #90caf9;
 }
 
-/* Sidebar menu buttons - định dạng nút bấm Sidebar như code gốc */
 section[data-testid="stSidebar"] div[role="radiogroup"] {
     gap: 8px !important;
 }
@@ -146,12 +168,10 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     border-left: 5px solid #facc15 !important;
 }
 
-/* Ẩn nút tròn radio */
 section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
     display: none !important;
 }
 
-/* Chữ hiển thị menu */
 section[data-testid="stSidebar"] div[role="radiogroup"] label p {
     color: #ffffff !important;
     font-size: 15px !important;
@@ -166,7 +186,6 @@ section[data-testid="stSidebar"] { width: 260px !important; min-width: 260px !im
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
 .block-container { padding-top: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
 
-/* Font thông báo */
 div[data-baseweb="notification"] div,
 .stAlert p {
     font-size: 13px !important;
@@ -325,6 +344,9 @@ def normalize_location_key(loc_str):
         (r"\b(giang duong 3c|gd 3c|3c)\b", "giangduong3c"),
         (r"\b(giang duong 1|gd 1)\b", "giangduong1"),
         (r"\b(giang duong 2|gd 2)\b", "giangduong2"),
+        (r"\b(san truong 217 khu cot co|san 217 cot co|cot co)\b", "san217cotco"),
+        (r"\b(san truong khu nha 15 tang|san 15 tang|nha 15 tang)\b", "san15tang"),
+        (r"\b(san the thao da nang|san the thao|da nang)\b", "santhethaodanang"),
     ]
     for pattern, repl in synonyms:
         if re.search(pattern, txt):
@@ -333,7 +355,7 @@ def normalize_location_key(loc_str):
     noise_words = [
         r"\blau\s*\d+\b", r"\btang\s*\d+\b", r"\bkhu\s*[a-z0-9]+\b", 
         r"\bnha\s*[a-z0-9]+\b", r"\bco so\s*\d*\b", r"\bcs\s*\d*\b",
-        r"\bgiang duong\b", r"\bhoi truong\b", r"\bphong hop\b", r"\bphong\b", r"\bgd\b", r"\bht\b"
+        r"\bgiang duong\b", r"\bhoi truong\b", r"\bphong hop\b", r"\bphong\b", r"\bgd\b", r"\bht\b", r"\bsan truong\b"
     ]
     for nw in noise_words:
         txt = re.sub(nw, "", txt)
@@ -643,7 +665,7 @@ def process_raw_dataframe(df_raw):
         t2 = parse_time(df.at[i, "end_time"] if "end_time" in df.columns else None)
         if t2 and pd.notna(df.at[i, "end"]): df.at[i, "end"] = df.at[i, "end"].replace(hour=t2[0], minute=t2[1])
 
-    for col in ["item_id", "event", "donvi", "location", "support", "nguoi_phu_trach", "nguoi_dang_ky", "email", "approval_opinion", "thanh_phan"]:
+    for col in ["item_id", "event", "donvi", "location", "support", "nguoi_phu_trach", "nguoi_dang_ky", "email", "approval_opinion", "thanh_phan", "completed_at"]:
         if col not in df.columns: df[col] = ""
         else: df[col] = df[col].astype(str).replace("nan", "").str.strip()
         
@@ -689,7 +711,8 @@ def build_approval_summary_table(df_input):
         })
     return pd.DataFrame(rows, columns=columns)
 
-def build_support_table(df_input):
+def build_support_table_with_status(df_input):
+    """Xây dựng bảng hỗ trợ kèm trạng thái nhận nhiệm vụ, hoàn thành & cảnh báo chậm tiến độ"""
     support_cols = {
         "support_ban_don_tiep": "Bàn đón tiếp", "support_khan_ban": "Trải khăn bàn hội trường",
         "support_le_tan": "Lễ tân", "support_bang_ten": "Bảng tên mica",
@@ -700,27 +723,78 @@ def build_support_table(df_input):
         "support_khay_bung": "Khay bưng", "support_bandroll_standee": "Bandroll/standee",
         "support_backdrop": "Backdrop", "support_thu_moi": "Gửi thư mời", "support_khac": "Yêu cầu khác"
     }
+    
     rows = []
+    now = datetime.now()
+    
     for _, r in df_input.iterrows():
-        has_support_flag, has_detail = is_yes(r.get("support", "")), False
-        for col, label in support_cols.items():
-            if col in df_input.columns:
-                qty = count_value(r.get(col, ""))
+        has_support_flag = is_yes(r.get("support", ""))
+        item_id = str(r.get("item_id", "")).strip()
+        app_time_str = clean_text(r.get("completed_at", ""))
+        app_time = pd.to_datetime(app_time_str, errors="coerce")
+        start_time = r.get("start")
+        
+        has_detail = False
+        for col_key, label in support_cols.items():
+            if col_key in df_input.columns:
+                qty = count_value(r.get(col_key, ""))
                 if qty > 0:
                     has_detail = True
+                    # Đọc trạng thái từ cột phân công (nếu có)
+                    status_col = f"status_{col_key}"
+                    status_val = clean_text(r.get(status_col, ""))
+                    
+                    is_assigned = "ĐÃ NHẬN" in status_val.upper()
+                    is_done = "HOÀN THÀNH" in status_val.upper()
+                    
+                    alert_tag = "✅ Bình thường"
+                    # 1. Cảnh báo chưa nhận sau duyệt 24h
+                    if not is_assigned and pd.notna(app_time):
+                        if (now - app_time).total_seconds() > 86400:
+                            alert_tag = "⚠️ Chưa có người nhận (>24h duyệt)"
+                    # 2. Cảnh báo khẩn cấp trước 24h diễn ra sự kiện chưa hoàn thành
+                    if not is_done and pd.notna(start_time):
+                        if 0 <= (start_time - now).total_seconds() <= 86400:
+                            alert_tag = "🚨 Khẩn: Chưa xong (<24h bắt đầu)"
+                        elif (start_time - now).total_seconds() < 0:
+                            alert_tag = "🔴 Quá hạn hoàn thành"
+                    
                     rows.append({
-                        "Sự kiện": r.get("event", ""), "Đơn vị": r.get("donvi", ""),
-                        "Ngày giờ": r.get("start").strftime("%d/%m/%Y %H:%M") if pd.notna(r.get("start")) else "",
-                        "Địa điểm": r.get("location", ""), "Nội dung hỗ trợ": label,
-                        "Số lượng": qty
+                        "ID": item_id,
+                        "Sự kiện": r.get("event", ""),
+                        "Đơn vị": r.get("donvi", ""),
+                        "Ngày giờ": start_time.strftime("%d/%m/%Y %H:%M") if pd.notna(start_time) else "",
+                        "Địa điểm": r.get("location", ""),
+                        "Hạng mục": label,
+                        "Số lượng": qty,
+                        "Trạng thái thực hiện": status_val if status_val else "Chưa nhận nhiệm vụ",
+                        "Cảnh báo tiến độ": alert_tag,
+                        "_col_key": col_key
                     })
+                    
         if has_support_flag and not has_detail:
+            status_val = clean_text(r.get("status_support_general", ""))
+            is_assigned = "ĐÃ NHẬN" in status_val.upper()
+            is_done = "HOÀN THÀNH" in status_val.upper()
+            alert_tag = "✅ Bình thường"
+            if not is_assigned and pd.notna(app_time) and (now - app_time).total_seconds() > 86400:
+                alert_tag = "⚠️ Chưa có người nhận (>24h duyệt)"
+            if not is_done and pd.notna(start_time) and 0 <= (start_time - now).total_seconds() <= 86400:
+                alert_tag = "🚨 Khẩn: Chưa xong (<24h bắt đầu)"
+                
             rows.append({
-                "Sự kiện": r.get("event", ""), "Đơn vị": r.get("donvi", ""),
-                "Ngày giờ": r.get("start").strftime("%d/%m/%Y %H:%M") if pd.notna(r.get("start")) else "",
-                "Địa điểm": r.get("location", ""), "Nội dung hỗ trợ": "Có yêu cầu hỗ trợ",
-                "Số lượng": 1
+                "ID": item_id,
+                "Sự kiện": r.get("event", ""),
+                "Đơn vị": r.get("donvi", ""),
+                "Ngày giờ": start_time.strftime("%d/%m/%Y %H:%M") if pd.notna(start_time) else "",
+                "Địa điểm": r.get("location", ""),
+                "Hạng mục": "Yêu cầu hỗ trợ chung",
+                "Số lượng": 1,
+                "Trạng thái thực hiện": status_val if status_val else "Chưa nhận nhiệm vụ",
+                "Cảnh báo tiến độ": alert_tag,
+                "_col_key": "status_support_general"
             })
+            
     return pd.DataFrame(rows)
 
 def build_detailed_support_table_html(raw_data):
@@ -757,8 +831,7 @@ def build_detailed_support_table_html(raw_data):
                 if qty > 0:
                     detailed_rows.append(f"<tr><td>{display_name}</td><td>{qty}</td></tr>")
 
-    if not detailed_rows:
-        return ""
+    if not detailed_rows: return ""
 
     return f"""
     <div class="details-support-table-wrap">
@@ -797,12 +870,11 @@ if not df.empty:
     num_pending = len(df[df.apply(approval_text_from_row, axis=1) == ""])
 phe_duyet_label = f"Phê duyệt 🔴 {num_pending}" if num_pending > 0 else "Phê duyệt"
 
-# 2. Đếm số lượng xung đột thực tế
+# 2. Đếm số lượng xung đột thực tế (Toàn bộ tương lai từ hiện tại)
 num_conflicts = 0
 if not df.empty:
     now_ts = datetime.now()
-    limit_ts = now_ts + timedelta(days=30)
-    upcoming_events = df[(df["start"] >= now_ts) & (df["start"] <= limit_ts)].copy()
+    upcoming_events = df[df["start"] >= (now_ts - timedelta(days=1))].copy()
     
     for i, j in [(i, j) for i in range(len(upcoming_events)) for j in range(i+1, len(upcoming_events))]:
         a, b = upcoming_events.iloc[i], upcoming_events.iloc[j]
@@ -814,16 +886,24 @@ if not df.empty:
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
+# 3. Đếm cảnh báo trễ hạn hỗ trợ
+num_support_alerts = 0
+if not df.empty:
+    supp_approved_df = keep_only_thong_nhat_for_calendar(df)
+    st_full = build_support_table_with_status(supp_approved_df)
+    if not st_full.empty:
+        num_support_alerts = len(st_full[st_full["Cảnh báo tiến độ"].str.contains("⚠️|🚨|🔴")])
+
+ho_tro_label = f"Hỗ trợ 🟡 {num_support_alerts}" if num_support_alerts > 0 else "Hỗ trợ"
+
 # Menu Sidebar
-menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, "Hỗ trợ", "Truy vấn AI", phe_duyet_label, "Liên hệ"]
+menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, ho_tro_label, "Truy vấn AI", phe_duyet_label, "Liên hệ"]
 selected_menu = st.sidebar.radio("", menu_options, label_visibility="collapsed")
 
-if selected_menu.startswith("Phê duyệt"):
-    menu = "Phê duyệt"
-elif selected_menu.startswith("Cảnh báo"):
-    menu = "Cảnh báo"
-else:
-    menu = selected_menu
+if selected_menu.startswith("Phê duyệt"): menu = "Phê duyệt"
+elif selected_menu.startswith("Cảnh báo"): menu = "Cảnh báo"
+elif selected_menu.startswith("Hỗ trợ"): menu = "Hỗ trợ"
+else: menu = selected_menu
 
 donvi_parent_list = sorted([d for d in df["donvi_parent"].dropna().unique() if d]) if not df.empty else []
 selected = st.sidebar.multiselect("Chọn đơn vị", ["Toàn trường"] + list(donvi_parent_list), default=["Toàn trường"])
@@ -853,6 +933,9 @@ def enforce_menu_access(menu_name):
 
 # --- DASHBOARD ---
 if menu == "Dashboard":
+    if "dash_msg" in st.session_state:
+        st.success(st.session_state.pop("dash_msg"))
+        
     try:
         fresh_df = load_data_no_cache()
         fresh_df = fresh_df if "Toàn trường" in selected or fresh_df.empty else fresh_df[fresh_df["donvi_parent"].isin(selected)]
@@ -900,6 +983,7 @@ if menu == "Dashboard":
                 "title": title, "start": start_str, "end": end_str,
                 "backgroundColor": color, "borderColor": "#B91C1C" if is_holiday else color, "textColor": text_color,
                 "extendedProps": {
+                    "item_id": str(r.get("item_id", "")).strip(),
                     "panel_event_title": event_name_str,
                     "panel_donvi": clean_text(r.get("donvi", "")),
                     "panel_location": location,
@@ -951,11 +1035,10 @@ if menu == "Dashboard":
     if selected_event_props:
         props = selected_event_props
         raw_row_data = {}
-        try:
-            raw_row_data = json.loads(props['raw_row_data_json_string'])
-        except Exception:
-            pass
+        try: raw_row_data = json.loads(props['raw_row_data_json_string'])
+        except Exception: pass
 
+        ev_id = props.get("item_id", "")
         content_bang_dien_tu = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
         val_bang_dt = clean_text(raw_row_data.get("support_bang_dien_tu", ""))
         if not content_bang_dien_tu and val_bang_dt and val_bang_dt.upper() not in ["CÓ", "CO", "YES", "Y", "TRUE", "1", "KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]:
@@ -963,7 +1046,7 @@ if menu == "Dashboard":
 
         details_html = f"""
         <div class="event-details-panel">
-            <div class="details-title">📱 Chi tiết sự kiện đã chọn trên lịch</div>
+            <div class="details-title">📱 Chi tiết sự kiện (ID: {ev_id})</div>
             <div class="details-item"><span class="details-label">📌 Sự kiện:</span> {props['panel_event_title']}</div>
             <div class="details-item"><span class="details-label">🏛️ Đơn vị:</span> {props['panel_donvi']}</div>
             <div class="details-item"><span class="details-label">📍 Địa điểm:</span> {props['panel_location']}</div>
@@ -985,9 +1068,35 @@ if menu == "Dashboard":
         details_html += "</div>"
         st.markdown(details_html, unsafe_allow_html=True)
 
-        if st.button("✖ Đóng xem chi tiết"):
-            st.session_state.selected_event_details = None
-            st.rerun()
+        col_act1, col_act2 = st.columns([1, 1.2])
+        with col_act1:
+            if st.button("✖ Đóng xem chi tiết"):
+                st.session_state.selected_event_details = None
+                st.rerun()
+                
+        # ================= CHỨC NĂNG ADMIN XÓA TRỰC TIẾP TRÊN DASHBOARD =================
+        with col_act2:
+            with st.expander("🗑️ Quản trị viên: Xóa sự kiện này"):
+                if not st.session_state.get("admin_logged_in", False):
+                    adm_pwd = st.text_input("Nhập mật khẩu Admin để mở khóa nút xóa", type="password", key=f"dash_del_pwd_{ev_id}")
+                    if st.button("Xác thực Admin", key=f"dash_del_auth_{ev_id}"):
+                        if adm_pwd == st.secrets.get("admin", {}).get("password", "") and adm_pwd != "":
+                            st.session_state["admin_logged_in"] = True
+                            st.rerun()
+                        else:
+                            st.error("Mật khẩu Admin không đúng!")
+                else:
+                    chk_confirm = st.checkbox(f"Xác nhận xóa hoàn toàn sự kiện ID {ev_id}", key=f"chk_dash_del_{ev_id}")
+                    if st.button("XÁC NHẬN XÓA HẲN SỰ KIỆN", type="secondary", disabled=not chk_confirm, key=f"btn_dash_del_{ev_id}"):
+                        with st.spinner("Đang xóa sự kiện khỏi OneDrive..."):
+                            df_ex = read_onedrive_excel()
+                            mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == str(ev_id)) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
+                            if mask.any():
+                                df_new = df_ex[~mask].copy()
+                                if save_onedrive_excel(df_new):
+                                    st.session_state["dash_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {ev_id} khỏi OneDrive!"
+                                    st.session_state.selected_event_details = None
+                                    st.rerun()
 
     st.subheader("📈 Tổng quan")
     week_start = (today - timedelta(days=today.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1172,18 +1281,28 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             show_table_with_download(f"Bảng thống kê theo đơn vị ({label})", table_r, f"bc_{report_period}.xlsx", compact=True)
         else: st.info(f"Không có dữ liệu {label}.")
         
+    # ================= MỤC CẢNH BÁO TRÙNG LỊCH (QUÉT TOÀN BỘ TƯƠNG LAI) =================
     elif menu == "Cảnh báo":
         st.markdown('<div class="table-title">⚠️ Thống kê & Xử lý xung đột lịch sự kiện</div>', unsafe_allow_html=True)
         if "warn_msg" in st.session_state:
             st.success(st.session_state.pop("warn_msg"))
             
-        c_p1, c_p2 = st.columns([1.2, 2.8])
+        c_p1, c_p2 = st.columns([1.8, 2.2])
         with c_p1:
-            period = st.radio("Kỳ rà soát", ["Tuần", "Tháng", "Toàn bộ"], horizontal=True, label_visibility="collapsed")
+            period = st.radio(
+                "Kỳ rà soát", 
+                ["Từ hiện tại về sau (Toàn bộ tương lai)", "Tuần này", "Chọn Tháng cụ thể", "Tất cả dữ liệu"], 
+                index=0, 
+                horizontal=False
+            )
         
-        if period == "Toàn bộ":
-            warn_df, label = df_f.copy(), "Toàn bộ dữ liệu"
-        elif period == "Tuần":
+        now_ts = datetime.now()
+        if period == "Từ hiện tại về sau (Toàn bộ tương lai)":
+            warn_df = df_f[df_f["start"] >= (now_ts - timedelta(days=1))].copy()
+            label = "Toàn bộ các sự kiện sắp tới"
+        elif period == "Tất cả dữ liệu":
+            warn_df, label = df_f.copy(), "Toàn bộ lịch sử & tương lai"
+        elif period == "Tuần này":
             warn_df, label, _, _ = get_period_df(df_f, "Tuần")
         else:
             with c_p2:
@@ -1192,7 +1311,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     sel_month = st.selectbox("Chọn tháng", range(1, 13), index=today.month - 1, format_func=lambda x: f"Tháng {x}")
                 with m_col2:
                     current_year = today.year
-                    sel_year = st.selectbox("Chọn năm", [current_year - 1, current_year, current_year + 1], index=1)
+                    sel_year = st.selectbox("Chọn năm", [current_year, current_year + 1, current_year + 2], index=0)
             
             m_start = datetime(sel_year, sel_month, 1, 0, 0, 0)
             m_end = datetime(sel_year + 1, 1, 1, 0, 0, 0) if sel_month == 12 else datetime(sel_year, sel_month + 1, 1, 0, 0, 0)
@@ -1201,7 +1320,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             
         conf = []
         conflicted_event_ids = set()
-        
         count_loc_conflict = 0
         count_delegate_conflict = 0
         
@@ -1220,7 +1338,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     loc_b = clean_text(b.get("location", ""))
                     is_loc_dup = is_same_location(loc_a, loc_b)
 
-                    # Chỉ ghi nhận xung đột nếu TRÙNG ĐỊA ĐIỂM hoặc TRÙNG ĐẠI BIỂU
                     if is_loc_dup or len(trung_nguoi) > 0:
                         overlap_mins = int((overlap_end - overlap_start).total_seconds() / 60)
                         time_overlap_type = f"Trùng {overlap_mins} phút ({overlap_start.strftime('%H:%M')} - {overlap_end.strftime('%H:%M')})"
@@ -1250,7 +1367,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         else:
             st.markdown(f"##### 📊 Thống kê mức độ xung đột ({label})")
             m1, m2, m3 = st.columns(3)
-            m1.metric("Tổng cặp xung đột cần xử lý", len(conf))
+            m1.metric("Tổng cặp xung đột", len(conf))
             m2.metric("📍 Trùng Địa điểm", count_loc_conflict)
             m3.metric("👥 Trùng Đại biểu", count_delegate_conflict)
             
@@ -1345,13 +1462,92 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                                 st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                                 st.rerun()
         
+    # ================= MỤC HỖ TRỢ & PHÂN CÔNG / XÁC NHẬN TIẾN ĐỘ =================
     elif menu == "Hỗ trợ":
-        st.markdown('<div class="table-title">Hỗ trợ</div>', unsafe_allow_html=True)
-        period = st.radio("Hỗ trợ", ["Tuần", "Tháng"], horizontal=True, label_visibility="collapsed")
-        df_supp, label, _, _ = get_period_df(df_f, period)
-        supp_t = build_support_table(df_supp)
-        if not supp_t.empty: show_table_with_download(f"{label}", collapse_repeated_support_rows(supp_t), f"ht_{period}.xlsx", compact=True)
-        else: st.info("Không yêu cầu hỗ trợ.")
+        st.markdown('<div class="table-title">🛠️ Quản lý & Xác nhận nhiệm vụ Hỗ trợ sự kiện</div>', unsafe_allow_html=True)
+        if "supp_act_msg" in st.session_state:
+            st.success(st.session_state.pop("supp_act_msg"))
+            
+        period = st.radio("Kỳ thống kê", ["Tuần", "Tháng", "Tất cả tương lai"], index=2, horizontal=True)
+        
+        now = datetime.now()
+        if period == "Tuần":
+            df_supp_base, label, _, _ = get_period_df(df_f, "Tuần")
+        elif period == "Tháng":
+            df_supp_base, label, _, _ = get_period_df(df_f, "Tháng")
+        else:
+            df_supp_base = df_f[df_f["start"] >= (now - timedelta(days=1))].copy()
+            label = "Toàn bộ sự kiện tương lai"
+            
+        df_supp_approved = keep_only_thong_nhat_for_calendar(df_supp_base)
+        supp_t = build_support_table_with_status(df_supp_approved)
+        
+        if supp_t.empty:
+            st.info(f"Không có yêu cầu hỗ trợ nào trong kỳ ({label}).")
+        else:
+            # 1. Thống kê nhanh cảnh báo tiến độ
+            n_unassigned = len(supp_t[supp_t["Cảnh báo tiến độ"].str.contains("⚠️")])
+            n_urgent = len(supp_t[supp_t["Cảnh báo tiến độ"].str.contains("🚨|🔴")])
+            
+            c_m1, c_m2, c_m3 = st.columns(3)
+            c_m1.metric("Tổng hạng mục cần hỗ trợ", len(supp_t))
+            c_m2.metric("⚠️ Chưa nhận (>24h duyệt)", n_unassigned)
+            c_m3.metric("🚨 Khẩn cấp (<24h bắt đầu)", n_urgent)
+            
+            # Hiển thị bảng chi tiết
+            disp_table = supp_t.drop(columns=["_col_key"])
+            show_table_with_download(f"Bảng theo dõi hạng mục hỗ trợ ({label})", disp_table, f"ht_{period}.xlsx", compact=True)
+            
+            st.markdown("---")
+            st.markdown('<div class="table-title">✍️ Cập nhật Tiến độ & Nhận nhiệm vụ</div>', unsafe_allow_html=True)
+            
+            with st.container(border=True):
+                # Tạo danh sách chọn hạng mục công việc
+                task_options = [
+                    f"ID {r['ID']} - {r['Sự kiện']} | Hạng mục: {r['Hạng mục']} (SL: {r['Số lượng']}) | {r['_col_key']}" 
+                    for _, r in supp_t.iterrows()
+                ]
+                sel_task_opt = st.selectbox("👉 Chọn hạng mục công việc để cập nhật:", task_options)
+                
+                matched_row = supp_t[supp_t.apply(lambda r: f"ID {r['ID']} - {r['Sự kiện']} | Hạng mục: {r['Hạng mục']} (SL: {r['Số lượng']}) | {r['_col_key']}" == sel_task_opt, axis=1)].iloc[0]
+                
+                sel_id = matched_row["ID"]
+                sel_col_key = matched_row["_col_key"]
+                status_field_name = f"status_{sel_col_key}"
+                
+                st.caption(f"Trạng thái hiện tại: **{matched_row['Trạng thái thực hiện']}** | Cảnh báo: **{matched_row['Cảnh báo tiến độ']}**")
+                
+                sc1, sc2 = st.columns(2)
+                with sc1:
+                    staff_name = st.text_input("Họ và tên nhân viên thực hiện:", placeholder="VD: Nguyễn Văn A...")
+                with sc2:
+                    action_choice = st.radio("Chọn hành động xác nhận:", ["Đã nhận nhiệm vụ", "Đã hoàn thành"], horizontal=True)
+                    
+                if st.button("💾 Ghi nhận tiến độ nhiệm vụ", type="primary"):
+                    if not staff_name.strip():
+                        st.error("Vui lòng nhập Họ tên nhân viên thực hiện!")
+                    else:
+                        with st.spinner("Đang lưu trạng thái lên OneDrive..."):
+                            df_ex = read_onedrive_excel()
+                            mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == str(sel_id)) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(sel_id, errors="coerce"))
+                            
+                            if mask.any():
+                                now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                if status_field_name not in df_ex.columns:
+                                    df_ex[status_field_name] = ""
+                                    
+                                current_raw_status = clean_text(df_ex.loc[mask, status_field_name].values[0])
+                                
+                                if action_choice == "Đã nhận nhiệm vụ":
+                                    new_status_str = f"ĐÃ NHẬN: {staff_name.strip()} ({now_str})"
+                                else:
+                                    new_status_str = f"HOÀN THÀNH: {staff_name.strip()} ({now_str}) | Trước đó: {current_raw_status}"
+                                    
+                                df_ex.loc[mask, status_field_name] = new_status_str
+                                
+                                if save_onedrive_excel(df_ex):
+                                    st.session_state["supp_act_msg"] = f"🎉 Đã ghi nhận: '{new_status_str}' cho sự kiện ID {sel_id}!"
+                                    st.rerun()
 
     elif menu == "Truy vấn AI":
         st.markdown('<div class="table-title">🧠 Truy vấn AI</div>', unsafe_allow_html=True)
@@ -1367,7 +1563,8 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             elif "tuần" in low or "tháng" in low:
                 show_table_with_download("KQ AI", build_approval_summary_table(get_period_df(df_f, "Tuần" if "tuần" in low else "Tháng")[0]), "ai_sq.xlsx", compact=True)
             elif "hỗ trợ" in low or "ht" in low:
-                show_table_with_download("KQ AI Hỗ trợ", collapse_repeated_support_rows(build_support_table(df_f)), "ai_ht.xlsx", compact=True)
+                supp_ap = keep_only_thong_nhat_for_calendar(df_f)
+                show_table_with_download("KQ AI Hỗ trợ", collapse_repeated_support_rows(build_support_table_with_status(supp_ap)), "ai_ht.xlsx", compact=True)
             else:
                 st.warning("Thử lại với: tháng 7, tuần, tháng, hỗ trợ")
 
