@@ -130,7 +130,7 @@ SUPPORT_FIELDS_MAP = {
 }
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (TĂNG SIZE CHỮ THÔNG TIN TRONG SUỐT BẢNG)
+# 1. GIAO DIỆN & CSS
 # ==============================================================================
 st.markdown("""
 <style>
@@ -268,7 +268,6 @@ div[data-baseweb="notification"] div,
     background: #f8fafc;
 }
 
-/* Tăng cỡ chữ Chi tiết sự kiện to rõ ràng */
 .event-details-panel {
     background: #ffffff;
     border: 1px solid #cbd5e1;
@@ -735,7 +734,6 @@ def build_approval_summary_table(df_input):
     return pd.DataFrame(rows, columns=columns)
 
 def build_support_table_with_status(df_input):
-    """Xây dựng bảng hỗ trợ kèm trạng thái nhận nhiệm vụ, hoàn thành & cảnh báo chậm tiến độ"""
     support_cols = {
         "support_ban_don_tiep": "Bàn đón tiếp", "support_khan_ban": "Trải khăn bàn hội trường",
         "support_le_tan": "Lễ tân", "support_bang_ten": "Bảng tên mica",
@@ -1011,7 +1009,7 @@ if menu == "Dashboard":
 
     selected_event_props = st.session_state.get("selected_event_details", None)
     
-    # ================= KHUNG CHI TIẾT SỰ KIỆN TO RÕ & TÍCH HỢP BẢNG HỖ TRỢ TRỰC TIẾP =================
+    # ================= KHUNG CHI TIẾT SỰ KIỆN TO RÕ & BẢO MẬT USER KHI THAO TÁC =================
     if selected_event_props:
         props = selected_event_props
         raw_row_data = {}
@@ -1020,7 +1018,6 @@ if menu == "Dashboard":
 
         ev_id = str(props.get("item_id", "")).strip()
         
-        # Đọc dữ liệu mới nhất từ file gốc để hiển thị đúng tiến độ hỗ trợ hiện thời
         cur_ev_row = df[df["item_id"].astype(str).str.strip() == ev_id]
         if not cur_ev_row.empty:
             raw_row_data.update(cur_ev_row.iloc[0].to_dict())
@@ -1030,7 +1027,6 @@ if menu == "Dashboard":
         if not content_bang_dien_tu and val_bang_dt and val_bang_dt.upper() not in ["CÓ", "CO", "YES", "Y", "TRUE", "1", "KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]:
             content_bang_dien_tu = val_bang_dt
 
-        # HTML Chi tiết sự kiện với cỡ chữ to rõ ràng
         details_html = f"""
         <div class="event-details-panel">
             <div class="details-title">📱 Chi tiết sự kiện (ID: {ev_id})</div>
@@ -1052,11 +1048,10 @@ if menu == "Dashboard":
         details_html += "</div>"
         st.markdown(details_html, unsafe_allow_html=True)
 
-        # Nếu có yêu cầu Hỗ trợ -> Hiển thị Bảng hạng mục có cột Trạng thái & Nút nhận nhiệm vụ trực tiếp
+        # Nếu có yêu cầu Hỗ trợ -> Hiển thị Bảng hạng mục & Nút thao tác (Yêu cầu Mật khẩu USER)
         if is_yes(props['panel_support_text']):
             st.markdown('<div class="table-title">🛠️ Danh sách hạng mục cần hỗ trợ & Trạng thái thực hiện</div>', unsafe_allow_html=True)
             
-            # Lọc các hạng mục hỗ trợ của riêng sự kiện này
             cur_support_tasks = []
             for col_k, col_label in SUPPORT_FIELDS_MAP.items():
                 if col_k in raw_row_data:
@@ -1085,14 +1080,28 @@ if menu == "Dashboard":
                     "status": st_gen_val if st_gen_val else "Chưa nhận nhiệm vụ"
                 })
 
-            # Chọn người thực hiện nhanh cho Dashboard
-            dash_st_col1, _ = st.columns([2, 2])
+            # Kiểm tra phân quyền USER cho thao tác nhận nhiệm vụ trên Dashboard
+            is_user_authorized = st.session_state.get("user_logged_in", False)
+            
+            dash_st_col1, dash_st_col2 = st.columns([1.8, 2.2])
             with dash_st_col1:
                 dash_worker_select = st.selectbox("👤 Chọn Người thực hiện:", DANH_MUC_NHAN_SU_HO_TRO, key=f"dash_worker_sel_{ev_id}")
                 dash_worker_custom = ""
                 if dash_worker_select == "Khác":
                     dash_worker_custom = st.text_input("Nhập tên người thực hiện:", placeholder="VD: Nguyễn Văn A...", key=f"dash_worker_custom_{ev_id}")
                 final_dash_worker = dash_worker_custom.strip() if dash_worker_select == "Khác" else dash_worker_select
+                
+            with dash_st_col2:
+                if not is_user_authorized:
+                    with st.expander("🔑 Đăng nhập mật khẩu USER để thao tác"):
+                        u_pwd_input = st.text_input("Nhập mật khẩu User:", type="password", key=f"pwd_dash_supp_{ev_id}")
+                        if st.button("Xác thực User", key=f"btn_dash_u_auth_{ev_id}"):
+                            if u_pwd_input == st.secrets.get("user", {}).get("password", "") and u_pwd_input != "":
+                                st.session_state["user_logged_in"] = True
+                                st.success("✅ Đã xác thực quyền User thành công!")
+                                st.rerun()
+                            else:
+                                st.error("Mật khẩu User không chính xác!")
 
             for t_idx, task in enumerate(cur_support_tasks):
                 c_key = task["col_key"]
@@ -1128,8 +1137,10 @@ if menu == "Dashboard":
                         else:
                             b_lbl, b_tp, nxt = "↩️ Hoàn tác", "secondary", "RESET"
 
-                        if st.button(b_lbl, key=f"dash_btn_tg_{ev_id}_{c_key}_{t_idx}", type=b_tp):
-                            if not final_dash_worker and nxt != "RESET":
+                        if st.button(b_lbl, key=f"dash_btn_tg_{ev_id}_{c_key}_{t_idx}", type=b_tp, disabled=not is_user_authorized):
+                            if not is_user_authorized:
+                                st.error("Vui lòng mở khóa mật khẩu USER ở khung trên!")
+                            elif not final_dash_worker and nxt != "RESET":
                                 st.error("Vui lòng chọn Người thực hiện ở ô phía trên!")
                             else:
                                 with st.spinner("Đang cập nhật trạng thái..."):
@@ -1603,7 +1614,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     custom_active_staff = st.text_input("Nhập tên Người thực hiện:", placeholder="VD: Nguyễn Văn A...", key="active_staff_custom")
                 current_worker = custom_active_staff.strip() if active_staff_select == "Khác" else active_staff_select
 
-            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`.")
+            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`. Hệ thống sẽ tự động xóa cảnh báo và giữ nguyên tại tab này.")
 
             for idx, r in supp_t.iterrows():
                 sel_id = str(r["ID"]).strip()
