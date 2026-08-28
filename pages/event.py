@@ -88,7 +88,7 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
     "Khác"
 ]
 
-# Danh mục nhân sự thực hiện hỗ trợ cố định (Đã sửa chính xác Đoàn Chính Linh)
+# Danh mục nhân sự thực hiện hỗ trợ cố định
 DANH_MUC_NHAN_SU_HO_TRO = [
     "Bùi Quang Chánh",
     "Đoàn Chính Linh",
@@ -109,12 +109,31 @@ DANH_MUC_NHAN_SU_HO_TRO = [
     "Khác"
 ]
 
+SUPPORT_FIELDS_MAP = {
+    "support_ban_don_tiep": "Số lượng bàn đón tiếp",
+    "support_khan_ban": "Cần trải khăn bàn hội trường",
+    "support_le_tan": "Số lượng lễ tân",
+    "support_bang_ten": "Số lượng bảng tên mica",
+    "support_bia_ky_ket": "Số lượng bìa ký kết",
+    "support_nuoc_uong": "Số lượng nước uống",
+    "support_teabreak": "Số phần Teabreak",
+    "support_hoa_ban": "Số lượng hoa để bàn",
+    "support_hoa_buc": "Số lượng hoa để bục phát biểu",
+    "support_hoa_tang": "Số lượng hoa bó để tặng",
+    "support_qua_tang": "Số lượng quà tặng",
+    "support_brochure": "Số lượng Brochure",
+    "support_khay_bung": "Số lượng khay bưng",
+    "support_bandroll_standee": "Bandroll/standee in & thi công",
+    "support_backdrop": "Backdrop in & thi công",
+    "support_thu_moi": "Cần gửi thư mời",
+    "support_khac": "Các yêu cầu khác"
+}
+
 # ==============================================================================
-# 1. GIAO DIỆN & CSS
+# 1. GIAO DIỆN & CSS (TĂNG SIZE CHỮ THÔNG TIN TRONG SUỐT BẢNG)
 # ==============================================================================
 st.markdown("""
 <style>
-/* 3 Nút chuyển ứng dụng trên đầu trang */
 .top-nav-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -143,7 +162,6 @@ st.markdown("""
     outline: 2px solid #90caf9;
 }
 
-/* Sidebar menu buttons */
 section[data-testid="stSidebar"] div[role="radiogroup"] {
     gap: 8px !important;
 }
@@ -250,18 +268,20 @@ div[data-baseweb="notification"] div,
     background: #f8fafc;
 }
 
+/* Tăng cỡ chữ Chi tiết sự kiện to rõ ràng */
 .event-details-panel {
     background: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
-    padding: 14px;
+    padding: 16px;
     margin-top: 14px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
 }
-.details-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 10px; }
-.details-item { font-size: 14px; color: #1e293b; margin-bottom: 5px; line-height: 1.4; }
-.details-label { font-weight: 700; color: #020617; }
-.details-support-title { font-size: 14px; font-weight: 700; color: #020617; margin-top: 12px; margin-bottom: 6px; }
+.details-title { font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+.details-item { font-size: 16px; color: #1e293b; margin-bottom: 8px; line-height: 1.45; font-weight: 600; }
+.details-label { font-size: 16px; font-weight: 800; color: #0f172a; }
+.details-val { font-size: 16px; font-weight: 700; color: #0b4a7a; }
+.details-support-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-top: 14px; margin-bottom: 8px; }
 
 .stButton>button { width: auto; font-size: 13px !important; }
 
@@ -269,6 +289,7 @@ div[data-baseweb="notification"] div,
     html, body { font-size: 13px !important; }
     .block-container { padding: 4px !important; }
     section[data-testid="stSidebar"] { width: 85% !important; }
+    .details-item, .details-label, .details-val { font-size: 14px !important; }
     .ump-table { font-size: 11px !important; }
     .ump-table th, .ump-table td { padding: 4px 5px !important; }
 }
@@ -796,59 +817,6 @@ def build_support_table_with_status(df_input):
             
     return pd.DataFrame(rows)
 
-def build_detailed_support_table_html(raw_data):
-    support_fields = {
-        "support_ban_don_tiep": "Số lượng bàn đón tiếp",
-        "support_khan_ban": "Cần trải khăn bàn hội trường",
-        "support_le_tan": "Số lượng lễ tân",
-        "support_bang_ten": "Số lượng bảng tên mica",
-        "support_bia_ky_ket": "Số lượng bìa ký kết",
-        "support_nuoc_uong": "Số lượng nước uống",
-        "support_teabreak": "Số phần Teabreak",
-        "support_hoa_ban": "Số lượng hoa để bàn",
-        "support_hoa_buc": "Số lượng hoa để bục phát biểu",
-        "support_hoa_tang": "Số lượng hoa bó để tặng",
-        "support_qua_tang": "Số lượng quà tặng",
-        "support_brochure": "Số lượng Brochure",
-        "support_khay_bung": "Số lượng khay bưng",
-        "support_bandroll_standee": "Bandroll/standee in & thi công",
-        "support_backdrop": "Backdrop in & thi công",
-        "support_thu_moi": "Cần gửi thư mời",
-        "support_khac": "Các yêu cầu khác"
-    }
-
-    detailed_rows = []
-    for field_key, display_name in support_fields.items():
-        if field_key in raw_data:
-            val = raw_data[field_key]
-            if field_key in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
-                txt = clean_text(val)
-                if txt and txt.upper() not in ["KHÔNG", "NONE", "N/A"]:
-                    detailed_rows.append(f"<tr><td>{display_name}</td><td>Có</td></tr>")
-            else:
-                qty = count_value(val)
-                if qty > 0:
-                    detailed_rows.append(f"<tr><td>{display_name}</td><td>{qty}</td></tr>")
-
-    if not detailed_rows: return ""
-
-    return f"""
-    <div class="details-support-table-wrap">
-        <div class="details-support-title"><strong>Nội dung hỗ trợ chi tiết</strong></div>
-        <table class="ump-table compact">
-            <thead>
-                <tr>
-                    <th>Nội dung hỗ trợ</th>
-                    <th>Số lượng/Yêu cầu</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join(detailed_rows)}
-            </tbody>
-        </table>
-    </div>
-    """
-
 # ==============================================================================
 # 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO
 # ==============================================================================
@@ -901,7 +869,6 @@ ho_tro_label = f"Hỗ trợ 🟡 {num_support_alerts}" if num_support_alerts > 0
 # Menu Sidebar
 menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, ho_tro_label, "Truy vấn AI", phe_duyet_label, "Liên hệ"]
 
-# Đồng bộ vị trí chọn tab an toàn
 curr_menu_idx = 0
 for idx, opt in enumerate(menu_options):
     if opt.startswith(st.session_state["menu_tab"]):
@@ -1044,41 +1011,143 @@ if menu == "Dashboard":
 
     selected_event_props = st.session_state.get("selected_event_details", None)
     
+    # ================= KHUNG CHI TIẾT SỰ KIỆN TO RÕ & TÍCH HỢP BẢNG HỖ TRỢ TRỰC TIẾP =================
     if selected_event_props:
         props = selected_event_props
         raw_row_data = {}
         try: raw_row_data = json.loads(props['raw_row_data_json_string'])
         except Exception: pass
 
-        ev_id = props.get("item_id", "")
+        ev_id = str(props.get("item_id", "")).strip()
+        
+        # Đọc dữ liệu mới nhất từ file gốc để hiển thị đúng tiến độ hỗ trợ hiện thời
+        cur_ev_row = df[df["item_id"].astype(str).str.strip() == ev_id]
+        if not cur_ev_row.empty:
+            raw_row_data.update(cur_ev_row.iloc[0].to_dict())
+
         content_bang_dien_tu = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
         val_bang_dt = clean_text(raw_row_data.get("support_bang_dien_tu", ""))
         if not content_bang_dien_tu and val_bang_dt and val_bang_dt.upper() not in ["CÓ", "CO", "YES", "Y", "TRUE", "1", "KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]:
             content_bang_dien_tu = val_bang_dt
 
+        # HTML Chi tiết sự kiện với cỡ chữ to rõ ràng
         details_html = f"""
         <div class="event-details-panel">
             <div class="details-title">📱 Chi tiết sự kiện (ID: {ev_id})</div>
-            <div class="details-item"><span class="details-label">📌 Sự kiện:</span> {props['panel_event_title']}</div>
-            <div class="details-item"><span class="details-label">🏛️ Đơn vị:</span> {props['panel_donvi']}</div>
-            <div class="details-item"><span class="details-label">📍 Địa điểm:</span> {props['panel_location']}</div>
-            <div class="details-item"><span class="details-label">🕒 Thời gian:</span> {props['panel_time_label']}</div>
-            <div class="details-item"><strong>Hỗ trợ:</strong> {props['panel_support_text'] or "Không yêu cầu"}</div>
+            <div class="details-item"><span class="details-label">📌 Sự kiện:</span> <span class="details-val">{props['panel_event_title']}</span></div>
+            <div class="details-item"><span class="details-label">🏛️ Đơn vị:</span> <span class="details-val">{props['panel_donvi']}</span></div>
+            <div class="details-item"><span class="details-label">📍 Địa điểm:</span> <span class="details-val">{props['panel_location']}</span></div>
+            <div class="details-item"><span class="details-label">🕒 Thời gian:</span> <span class="details-val">{props['panel_time_label']}</span></div>
+            <div class="details-item"><span class="details-label">🛠️ Hỗ trợ:</span> <span class="details-val">{props['panel_support_text'] or "Không yêu cầu"}</span></div>
         """
 
         val_thanh_phan = clean_text(props.get("panel_participants", "")) or clean_text(raw_row_data.get("thanh_phan", ""))
         if val_thanh_phan:
             tp_display = val_thanh_phan.replace("\n", "<br>")
-            details_html += f'<div class="details-item"><span class="details-label">👥 Thành phần:</span><br>{tp_display}</div>'
+            details_html += f'<div class="details-item"><span class="details-label">👥 Thành phần:</span><br><span style="font-weight:700; color:#334155;">{tp_display}</span></div>'
 
         if content_bang_dien_tu:
-            details_html += f'<div class="details-item"><strong>Nội dung chạy bảng điện tử:</strong> <strong>{content_bang_dien_tu}</strong></div>'
-
-        if is_yes(props['panel_support_text']):
-            details_html += build_detailed_support_table_html(raw_row_data)
+            details_html += f'<div class="details-item"><span class="details-label">📺 Nội dung chạy bảng điện tử:</span> <span class="details-val">{content_bang_dien_tu}</span></div>'
 
         details_html += "</div>"
         st.markdown(details_html, unsafe_allow_html=True)
+
+        # Nếu có yêu cầu Hỗ trợ -> Hiển thị Bảng hạng mục có cột Trạng thái & Nút nhận nhiệm vụ trực tiếp
+        if is_yes(props['panel_support_text']):
+            st.markdown('<div class="table-title">🛠️ Danh sách hạng mục cần hỗ trợ & Trạng thái thực hiện</div>', unsafe_allow_html=True)
+            
+            # Lọc các hạng mục hỗ trợ của riêng sự kiện này
+            cur_support_tasks = []
+            for col_k, col_label in SUPPORT_FIELDS_MAP.items():
+                if col_k in raw_row_data:
+                    val_k = raw_row_data[col_k]
+                    qty_k = count_value(val_k)
+                    if col_k in ["support_bandroll_standee", "support_backdrop", "support_khac"]:
+                        txt_k = clean_text(val_k)
+                        if txt_k and txt_k.upper() not in ["KHÔNG", "NONE", "N/A"]:
+                            qty_k = 1
+                    if qty_k > 0:
+                        st_col_k = f"status_{col_k}"
+                        st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
+                        cur_support_tasks.append({
+                            "col_key": col_k,
+                            "label": col_label,
+                            "qty": qty_k,
+                            "status": st_val_k if st_val_k else "Chưa nhận nhiệm vụ"
+                        })
+                        
+            if not cur_support_tasks:
+                st_gen_val = clean_text(raw_row_data.get("status_support_general", ""))
+                cur_support_tasks.append({
+                    "col_key": "status_support_general",
+                    "label": "Yêu cầu hỗ trợ chung",
+                    "qty": 1,
+                    "status": st_gen_val if st_gen_val else "Chưa nhận nhiệm vụ"
+                })
+
+            # Chọn người thực hiện nhanh cho Dashboard
+            dash_st_col1, _ = st.columns([2, 2])
+            with dash_st_col1:
+                dash_worker_select = st.selectbox("👤 Chọn Người thực hiện:", DANH_MUC_NHAN_SU_HO_TRO, key=f"dash_worker_sel_{ev_id}")
+                dash_worker_custom = ""
+                if dash_worker_select == "Khác":
+                    dash_worker_custom = st.text_input("Nhập tên người thực hiện:", placeholder="VD: Nguyễn Văn A...", key=f"dash_worker_custom_{ev_id}")
+                final_dash_worker = dash_worker_custom.strip() if dash_worker_select == "Khác" else dash_worker_select
+
+            for t_idx, task in enumerate(cur_support_tasks):
+                c_key = task["col_key"]
+                st_f_name = f"status_{c_key}" if not c_key.startswith("status_") else c_key
+                cur_stat_txt = task["status"]
+                is_task_done = "HOÀN THÀNH" in cur_stat_txt.upper()
+                is_task_recv = "ĐÃ NHẬN" in cur_stat_txt.upper()
+                
+                with st.container(border=True):
+                    tc1, tc2, tc3 = st.columns([2.5, 1.8, 1.2])
+                    with tc1:
+                        st.markdown(
+                            f"<div style='font-size: 16px; font-weight: 700; color: #0f172a;'>"
+                            f"👉 Hạng mục: <span style='color: #d97706;'>{task['label']}</span> | "
+                            f"SL: <span style='color: #dc2626;'>{task['qty']}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+                    with tc2:
+                        st.caption("Trạng thái thực hiện:")
+                        if is_task_done:
+                            st.markdown(f"✅ <span style='color:#16a34a; font-weight:700;'>{cur_stat_txt}</span>", unsafe_allow_html=True)
+                        elif is_task_recv:
+                            st.markdown(f"🔵 <span style='color:#2563eb; font-weight:700;'>{cur_stat_txt}</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"⚪ <span style='color:#6b7280; font-weight:700;'>Chưa nhận nhiệm vụ</span>", unsafe_allow_html=True)
+                    with tc3:
+                        st.caption("Thao tác:")
+                        if not is_task_recv and not is_task_done:
+                            b_lbl, b_tp, nxt = "👉 Nhận nhiệm vụ", "primary", "NHAN"
+                        elif is_task_recv and not is_task_done:
+                            b_lbl, b_tp, nxt = "✅ Báo hoàn thành", "secondary", "HOAN_THANH"
+                        else:
+                            b_lbl, b_tp, nxt = "↩️ Hoàn tác", "secondary", "RESET"
+
+                        if st.button(b_lbl, key=f"dash_btn_tg_{ev_id}_{c_key}_{t_idx}", type=b_tp):
+                            if not final_dash_worker and nxt != "RESET":
+                                st.error("Vui lòng chọn Người thực hiện ở ô phía trên!")
+                            else:
+                                with st.spinner("Đang cập nhật trạng thái..."):
+                                    df_ex = read_onedrive_excel()
+                                    mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
+                                    if mask.any():
+                                        now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                        if st_f_name not in df_ex.columns: df_ex[st_f_name] = ""
+                                        if nxt == "NHAN":
+                                            v_save = f"ĐÃ NHẬN: {final_dash_worker} ({now_str})"
+                                        elif nxt == "HOAN_THANH":
+                                            v_save = f"HOÀN THÀNH: {final_dash_worker} ({now_str})"
+                                        else:
+                                            v_save = ""
+                                        df_ex.loc[mask, st_f_name] = v_save
+                                        if save_onedrive_excel(df_ex):
+                                            st.session_state["dash_msg"] = f"🎉 Đã cập nhật mục '{task['label']}' thành công!"
+                                            st.rerun()
 
         col_act1, col_act2 = st.columns([1, 1.2])
         with col_act1:
@@ -1473,7 +1542,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                                 st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                                 st.rerun()
         
-    # ================= MỤC HỖ TRỢ (HIỂN THỊ ĐỦ + CỠ CHỮ TO + KHÔNG BỊ NHẢY TAB) =================
+    # ================= MỤC HỖ TRỢ =================
     elif menu == "Hỗ trợ":
         if not enforce_menu_access(menu): st.stop()
         
@@ -1534,9 +1603,8 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     custom_active_staff = st.text_input("Nhập tên Người thực hiện:", placeholder="VD: Nguyễn Văn A...", key="active_staff_custom")
                 current_worker = custom_active_staff.strip() if active_staff_select == "Khác" else active_staff_select
 
-            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`. Hệ thống sẽ tự động xóa cảnh báo và giữ nguyên tại tab này.")
+            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`.")
 
-            # Danh sách dạng Thẻ tương tác 1-chạm (Font to rõ ràng)
             for idx, r in supp_t.iterrows():
                 sel_id = str(r["ID"]).strip()
                 col_key = r["_col_key"]
@@ -1552,7 +1620,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     with c1:
                         st.markdown(f"**📌 ID {sel_id} - {r['Sự kiện']}** ({r['Đơn vị']})")
                         st.write(f"🕒 {r['Ngày giờ']} | 📍 {r['Địa điểm']}")
-                        # Làm to chữ Hạng mục và Số lượng nổi bật
                         st.markdown(
                             f"<div style='font-size: 16px; font-weight: 700; color: #0b4a7a; margin-top: 4px;'>"
                             f"👉 Hạng mục: <span style='color: #d97706;'>{r['Hạng mục']}</span> | "
@@ -1610,7 +1677,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                             
                                         df_ex.loc[mask, status_field] = val_save
                                         if save_onedrive_excel(df_ex):
-                                            # Ép giữ nguyên tab Hỗ trợ không cho nhảy về Dashboard
                                             st.session_state["menu_tab"] = "Hỗ trợ"
                                             st.session_state["supp_act_msg"] = f"🎉 Đã cập nhật '{r['Hạng mục']}' ID {sel_id} và tự động gỡ cảnh báo!"
                                             st.rerun()
