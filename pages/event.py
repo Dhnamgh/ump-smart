@@ -12,81 +12,85 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from io import BytesIO
-import streamlit.components.v1 as components
 
-st.set_page_config(page_title="APP QUẢN LÝ SỰ KIỆN UMP", page_icon="📅", layout="wide")
+st.set_page_config(layout="wide")
 
 # Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
 DANH_MUC_DON_VI_LON = [
-    "Đảng ủy", "Ban Giám hiệu", "Công đoàn", "Đoàn TN - Hội SV", "HĐ Khoa học - Đào tạo",
-    "P. Hành chính Tổng hợp", "P. Tổ chức Cán bộ", "P. Hợp tác Quốc tế", "P. Đào tạo Đại học",
-    "P. Công tác Sinh viên", "P. Đào tạo Sau Đại học", "P. Khoa học Công nghệ", "P. Quản trị Giáo tài",
-    "P. Thanh tra - Pháp chế", "P. ĐBCLGD & KT", "P. Kế hoạch Tài chính",
-    "Trường Y", "Trường Dược", "Trường ĐD-KTYH", "Khoa Răng Hàm Mặt", "Khoa Y tế Công cộng",
-    "Khoa Y học Cổ truyền", "Khoa Khoa học Cơ bản", "Bệnh viện ĐHYD TPHCM", "Phòng khám chuyên khoa RHM",
-    "TT. Kiểm chuẩn CL XNYH", "TT. Đào tạo NL theo NCXH", "TT. Công nghệ thông tin",
-    "TT. KHCN UMP", "TT. Giáo dục Y học", "TT. Y sinh học phân tử",
-    "Thư viện", "Ký túc xá", "Tạp chí Y học TPHCM", "Khác"
+    # Lãnh đạo & Tổ chức chính trị - xã hội
+    "Đảng ủy",
+    "Ban Giám hiệu",
+    "Công đoàn",
+    "Đoàn TN - Hội SV",
+    "HĐ Khoa học - Đào tạo",
+
+    # 11 Phòng chức năng
+    "P. Hành chính Tổng hợp",
+    "P. Tổ chức Cán bộ",
+    "P. Hợp tác Quốc tế",
+    "P. Đào tạo Đại học",
+    "P. Công tác Sinh viên",
+    "P. Đào tạo Sau Đại học",
+    "P. Khoa học Công nghệ",
+    "P. Quản trị Giáo tài",
+    "P. Thanh tra - Pháp chế",
+    "P. ĐBCLGD & KT",
+    "P. Kế hoạch Tài chính",
+
+    # 07 Đơn vị đào tạo
+    "Trường Y",
+    "Trường Dược",
+    "Trường ĐD-KTYH",
+    "Khoa Răng Hàm Mặt",
+    "Khoa Y tế Công cộng",
+    "Khoa Y học Cổ truyền",
+    "Khoa Khoa học Cơ bản",
+
+    # 02 Đơn vị Khám, chữa bệnh
+    "Bệnh viện ĐHYD TPHCM",
+    "Phòng khám chuyên khoa RHM",
+
+    # 06 Trung tâm
+    "TT. Kiểm chuẩn CL XNYH",
+    "TT. Đào tạo NL theo NCXH",
+    "TT. Công nghệ thông tin",
+    "TT. KHCN UMP",
+    "TT. Giáo dục Y học",
+    "TT. Y sinh học phân tử",
+
+    # 03 Đơn vị khác
+    "Thư viện",
+    "Ký túc xá",
+    "Tạp chí Y học TPHCM",
+    
+    "Khác"
 ]
 
+# Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
+# Danh mục địa điểm cố định trọng điểm thường xuyên diễn ra sự kiện
 DANH_MUC_DIA_DIEM_CO_DINH = [
-    "Phòng họp BGH", "Phòng Hội thảo", "Phòng Hội đồng", "Phòng họp Lầu 1", "Phòng họp Lầu 14",
-    "Đại giảng đường", "Giảng đường 3D", "Giảng đường 3C", "Giảng đường 1", "Giảng đường 2", "Giảng đường AB", "Khác"
+    "Phòng họp BGH",
+    "Phòng Hội thảo",
+    "Phòng Hội đồng",
+    "Phòng họp Lầu 1",
+    "Phòng họp Lầu 14",
+    "Đại giảng đường",
+    "Giảng đường 3D",
+    "Giảng đường 3C",
+    "Giảng đường 1",
+    "Giảng đường 2",
+    "Giảng đường AB",
+    "Khác"
 ]
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (CỐ ĐỊNH HOÀN TOÀN NÚT MENU MỞ SIDEBAR)
+# 1. GIAO DIỆN & CSS (DỰA TRÊN CƠ CHẾ NATIVE CHUẨN CỦA CODE GỐC)
 # ==============================================================================
 st.markdown("""
 <style>
-/* 1. Ép hiển thị nút mở sidebar trên điện thoại */
-[data-testid="stSidebarCollapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    position: fixed !important;
-    top: 8px !important;
-    left: 8px !important;
-    z-index: 99999999 !important;
-    background: #0f5c99 !important;
-    color: #ffffff !important;
-    border-radius: 8px !important;
-    width: 38px !important;
-    height: 38px !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-    opacity: 1 !important;
-}
-
-[data-testid="stSidebarCollapsedControl"] button {
-    display: flex !important;
-    visibility: visible !important;
-    color: #ffffff !important;
-    width: 100% !important;
-    height: 100% !important;
-}
-
-[data-testid="stSidebarCollapsedControl"] svg {
-    fill: #ffffff !important;
-    stroke: #ffffff !important;
-    display: block !important;
-    visibility: visible !important;
-}
-
-/* Header trong suốt */
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    height: 0px !important;
-}
-
-footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid="stToolbar"] {
-    display: none !important;
-    visibility: hidden !important;
-}
-
-/* 3 Nút chuyển App trên đầu trang */
+/* 3 Nút chuyển ứng dụng trên đầu trang */
 .top-nav-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -115,20 +119,46 @@ footer, #MainMenu, .stDeployButton, [data-testid="stStatusWidget"], [data-testid
     outline: 2px solid #90caf9;
 }
 
-/* Sidebar Radio Styling */
-section[data-testid="stSidebar"] div[role="radiogroup"] { gap: 8px !important; }
+/* Sidebar menu buttons - định dạng nút bấm Sidebar như code gốc */
+section[data-testid="stSidebar"] div[role="radiogroup"] {
+    gap: 8px !important;
+}
+
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
-    width: 100% !important; min-height: 42px !important; background: #0f5c99 !important; border-radius: 8px !important;
-    padding: 10px 14px !important; margin: 4px 0 !important; border: 1px solid #0b4a7a !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important; display: flex !important; align-items: center !important;
+    width: 100% !important;
+    min-height: 42px !important;
+    background: #0f5c99 !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    margin: 4px 0 !important;
+    border: 1px solid #0b4a7a !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important;
+    display: flex !important;
+    align-items: center !important;
 }
-section[data-testid="stSidebar"] div[role="radiogroup"] label:hover { background: #0b4a7a !important; }
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: #0b4a7a !important;
+}
+
 section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
-    background: #073b63 !important; border-left: 5px solid #facc15 !important;
+    background: #073b63 !important;
+    border-left: 5px solid #facc15 !important;
 }
-section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] { display: none !important; }
+
+/* Ẩn nút tròn radio */
+section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
+    display: none !important;
+}
+
+/* Chữ hiển thị menu */
 section[data-testid="stSidebar"] div[role="radiogroup"] label p {
-    color: #ffffff !important; font-size: 15px !important; font-weight: 700 !important; margin: 0 !important;
+    color: #ffffff !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 html, body { font-family: Arial, sans-serif; font-size: 18px; color: #111827; }
@@ -136,18 +166,75 @@ section[data-testid="stSidebar"] { width: 260px !important; min-width: 260px !im
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
 .block-container { padding-top: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
 
-.table-title { font-size: 16px; font-weight: 800; color: #020617; margin-top: 10px; margin-bottom: 8px; }
-.ump-table-wrap { width: 100%; overflow-x: auto; margin-bottom: 10px; }
-.ump-table-wrap.compact { width: fit-content; max-width: 100%; }
+/* Font thông báo */
+div[data-baseweb="notification"] div,
+.stAlert p {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+}
 
-.ump-table { border-collapse: collapse; font-size: 14px; color: #020617 !important; background: white; width: 100%; }
-.ump-table th { background: #f1f5f9; color: #020617 !important; font-weight: 800; border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; white-space: nowrap; }
-.ump-table td { color: #020617 !important; font-weight: 600; border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; line-height: 1.35; }
-.ump-table.compact th, .ump-table.compact td { white-space: nowrap; }
-.ump-table tr:nth-child(even) td { background: #f8fafc; }
+.table-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #020617;
+    margin-top: 10px;
+    margin-bottom: 8px;
+}
+
+.ump-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 10px;
+}
+
+.ump-table-wrap.compact {
+    width: fit-content;
+    max-width: 100%;
+}
+
+.ump-table {
+    border-collapse: collapse;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    color: #020617 !important;
+    background: white;
+    width: 100%;
+}
+
+.ump-table th {
+    background: #f1f5f9;
+    color: #020617 !important;
+    font-weight: 800;
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.ump-table td {
+    color: #020617 !important;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    vertical-align: top;
+    line-height: 1.35;
+}
+
+.ump-table.compact th,
+.ump-table.compact td {
+    white-space: nowrap;
+}
+
+.ump-table tr:nth-child(even) td {
+    background: #f8fafc;
+}
 
 .event-details-panel {
-    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-top: 14px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 14px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .details-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 10px; }
@@ -159,29 +246,8 @@ section[data-testid="stSidebar"] * { font-size: 13px !important; }
 
 @media screen and (max-width: 768px) {
     html, body { font-size: 13px !important; }
-    .block-container { padding: 4px !important; padding-top: 48px !important; }
+    .block-container { padding: 4px !important; }
     section[data-testid="stSidebar"] { width: 85% !important; }
-
-    iframe { max-width: 100% !important; }
-    .fc { font-size: 11px !important; }
-    .fc .fc-toolbar {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        gap: 4px !important;
-        margin: 4px 0 !important;
-    }
-    .fc .fc-toolbar-chunk { display: flex !important; justify-content: center !important; width: 100%; }
-    .fc .fc-toolbar-title { font-size: 13px !important; font-weight: 700 !important; text-align: center !important; }
-    .fc .fc-button { padding: 3px 8px !important; font-size: 11px !important; }
-    .fc-col-header-cell-cushion { font-size: 10px !important; padding: 2px !important; }
-    .fc-daygrid-day-number { font-size: 10px !important; padding: 1px 3px !important; }
-    .fc-daygrid-event { margin: 1px 0 !important; }
-    .fc-event-title { font-size: 9px !important; line-height: 1.1 !important; }
-
-    .event-details-panel { padding: 10px !important; margin-top: 8px !important; }
-    .details-title { font-size: 14px !important; }
-    .details-item { font-size: 12px !important; margin-bottom: 3px !important; }
     .ump-table { font-size: 11px !important; }
     .ump-table th, .ump-table td { padding: 4px 5px !important; }
 }
@@ -197,23 +263,6 @@ section[data-testid="stSidebar"] * { font-size: 13px !important; }
     APP QUẢN LÝ SỰ KIỆN UMP
 </div>
 """, unsafe_allow_html=True)
-
-# 2. Chèn JavaScript tự động duy trì nút bấm Sidebar trên Mobile
-components.html("""
-<script>
-function keepSidebarButtonAlive() {
-    const parentDoc = window.parent.document;
-    const btn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]');
-    if (btn) {
-        btn.style.setProperty('display', 'flex', 'important');
-        btn.style.setProperty('visibility', 'visible', 'important');
-        btn.style.setProperty('opacity', '1', 'important');
-        btn.style.setProperty('z-index', '99999999', 'important');
-    }
-}
-setInterval(keepSidebarButtonAlive, 400);
-</script>
-""", height=0, width=0)
 
 # ==============================================================================
 # 2. HÀM TRỢ GIÚP (HELPERS, TEXT NORMALIZATION & EMAIL)
@@ -356,7 +405,10 @@ def count_value(value):
 
 def event_color(index, key, is_holiday=False):
     if is_holiday: return "#EF4444"
-    palette = ["#DBEAFE", "#DCFCE7", "#FEE2E2", "#FFEDD5", "#F3E8FF", "#CCFBF1", "#FCE7F3", "#E0E7FF", "#CFFAFE", "#FEF3C7"]
+    palette = [
+        "#DBEAFE", "#DCFCE7", "#FEE2E2", "#FFEDD5", "#F3E8FF",
+        "#CCFBF1", "#FCE7F3", "#E0E7FF", "#CFFAFE", "#FEF3C7"
+    ]
     digest = int(hashlib.md5(str(key).encode("utf-8")).hexdigest(), 16)
     return palette[(digest + index) % len(palette)]
 
@@ -726,7 +778,7 @@ def build_detailed_support_table_html(raw_data):
     """
 
 # ==============================================================================
-# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO / MENU SIDEBAR
+# 4. KHỞI TẠO STATE & TÍNH TOÁN CẢNH BÁO
 # ==============================================================================
 df = load_data()
 bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
