@@ -69,7 +69,7 @@ DANH_MUC_DON_VI_LON = [
 # Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
-# Danh mục địa điểm cố định trọng điểm (Đã bổ sung 3 địa điểm sân trường mới)
+# Danh mục địa điểm cố định trọng điểm
 DANH_MUC_DIA_DIEM_CO_DINH = [
     "Phòng họp BGH",
     "Phòng Hội thảo",
@@ -88,7 +88,7 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
     "Khác"
 ]
 
-# Danh mục nhân sự thực hiện hỗ trợ cố định
+# Danh mục nhân sự thực hiện hỗ trợ cố định (Đã sửa chính xác Đoàn Chính Linh)
 DANH_MUC_NHAN_SU_HO_TRO = [
     "Bùi Quang Chánh",
     "Đoàn Chính Linh",
@@ -110,7 +110,7 @@ DANH_MUC_NHAN_SU_HO_TRO = [
 ]
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (DỰA TRÊN CƠ CHẾ GỐC GIỮ NGUYÊN NÚT SIDEBAR)
+# 1. GIAO DIỆN & CSS
 # ==============================================================================
 st.markdown("""
 <style>
@@ -143,7 +143,7 @@ st.markdown("""
     outline: 2px solid #90caf9;
 }
 
-/* Sidebar menu buttons - định dạng nút bấm Sidebar như code gốc */
+/* Sidebar menu buttons */
 section[data-testid="stSidebar"] div[role="radiogroup"] {
     gap: 8px !important;
 }
@@ -170,12 +170,10 @@ section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true
     border-left: 5px solid #facc15 !important;
 }
 
-/* Ẩn nút tròn radio */
 section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
     display: none !important;
 }
 
-/* Chữ hiển thị menu */
 section[data-testid="stSidebar"] div[role="radiogroup"] label p {
     color: #ffffff !important;
     font-size: 15px !important;
@@ -190,7 +188,6 @@ section[data-testid="stSidebar"] { width: 260px !important; min-width: 260px !im
 section[data-testid="stSidebar"] * { font-size: 13px !important; }
 .block-container { padding-top: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; max-width: 100% !important; }
 
-/* Font thông báo */
 div[data-baseweb="notification"] div,
 .stAlert p {
     font-size: 13px !important;
@@ -752,11 +749,9 @@ def build_support_table_with_status(df_input):
                     is_done = "HOÀN THÀNH" in status_val.upper()
                     
                     alert_tag = "✅ Bình thường"
-                    # 1. Cảnh báo sau duyệt 24h chưa có người nhận
                     if not is_assigned and not is_done and pd.notna(app_time):
                         if (now - app_time).total_seconds() > 86400:
                             alert_tag = "⚠️ Chưa có người nhận (>24h duyệt)"
-                    # 2. Cảnh báo khẩn cấp trước 24h bắt đầu chưa hoàn thành
                     if not is_done and pd.notna(start_time):
                         if 0 <= (start_time - now).total_seconds() <= 86400:
                             alert_tag = "🚨 Khẩn: Chưa xong (<24h bắt đầu)"
@@ -861,6 +856,9 @@ df = load_data()
 bgh_options_from_onedrive, leader_names_to_check = load_ump_leaders()
 today = datetime.today()
 
+if "menu_tab" not in st.session_state:
+    st.session_state["menu_tab"] = "Dashboard"
+
 if "selected_event_details" not in st.session_state:
     st.session_state.selected_event_details = None
 
@@ -902,12 +900,22 @@ ho_tro_label = f"Hỗ trợ 🟡 {num_support_alerts}" if num_support_alerts > 0
 
 # Menu Sidebar
 menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, ho_tro_label, "Truy vấn AI", phe_duyet_label, "Liên hệ"]
-selected_menu = st.sidebar.radio("", menu_options, label_visibility="collapsed")
+
+# Đồng bộ vị trí chọn tab an toàn
+curr_menu_idx = 0
+for idx, opt in enumerate(menu_options):
+    if opt.startswith(st.session_state["menu_tab"]):
+        curr_menu_idx = idx
+        break
+
+selected_menu = st.sidebar.radio("", menu_options, index=curr_menu_idx, label_visibility="collapsed")
 
 if selected_menu.startswith("Phê duyệt"): menu = "Phê duyệt"
 elif selected_menu.startswith("Cảnh báo"): menu = "Cảnh báo"
 elif selected_menu.startswith("Hỗ trợ"): menu = "Hỗ trợ"
 else: menu = selected_menu
+
+st.session_state["menu_tab"] = menu
 
 donvi_parent_list = sorted([d for d in df["donvi_parent"].dropna().unique() if d]) if not df.empty else []
 selected = st.sidebar.multiselect("Chọn đơn vị", ["Toàn trường"] + list(donvi_parent_list), default=["Toàn trường"])
@@ -1465,7 +1473,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                                 st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                                 st.rerun()
         
-    # ================= MỤC HỖ TRỢ (YÊU CẦU MẬT KHẨU USER & TOGGLE 1-CHẠM) =================
+    # ================= MỤC HỖ TRỢ (HIỂN THỊ ĐỦ + CỠ CHỮ TO + KHÔNG BỊ NHẢY TAB) =================
     elif menu == "Hỗ trợ":
         if not enforce_menu_access(menu): st.stop()
         
@@ -1473,22 +1481,41 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
         if "supp_act_msg" in st.session_state:
             st.success(st.session_state.pop("supp_act_msg"))
             
-        period = st.radio("Kỳ thống kê", ["Tuần", "Tháng", "Tất cả tương lai"], index=2, horizontal=True)
-        
+        sp1, sp2 = st.columns([2, 2])
+        with sp1:
+            support_filter_opt = st.radio(
+                "Phạm vi hiển thị:",
+                ["Toàn bộ sự kiện cần hỗ trợ (Tất cả)", "Tuần hiện tại", "Tháng hiện tại", "Chọn Tháng cụ thể trong năm"],
+                index=0,
+                horizontal=False
+            )
+            
         now = datetime.now()
-        if period == "Tuần":
+        if support_filter_opt == "Toàn bộ sự kiện cần hỗ trợ (Tất cả)":
+            df_supp_base = df_f.copy()
+            label = "Tất cả sự kiện cần hỗ trợ"
+        elif support_filter_opt == "Tuần hiện tại":
             df_supp_base, label, _, _ = get_period_df(df_f, "Tuần")
-        elif period == "Tháng":
+        elif support_filter_opt == "Tháng hiện tại":
             df_supp_base, label, _, _ = get_period_df(df_f, "Tháng")
         else:
-            df_supp_base = df_f[df_f["start"] >= (now - timedelta(days=1))].copy()
-            label = "Toàn bộ sự kiện tương lai"
+            with sp2:
+                sm_col1, sm_col2 = st.columns(2)
+                with sm_col1:
+                    s_month = st.selectbox("Tháng:", range(1, 13), index=today.month - 1, format_func=lambda x: f"Tháng {x}", key="supp_sel_m")
+                with sm_col2:
+                    s_year = st.selectbox("Năm:", [today.year - 1, today.year, today.year + 1], index=1, key="supp_sel_y")
+                    
+            sm_start = datetime(s_year, s_month, 1, 0, 0, 0)
+            sm_end = datetime(s_year + 1, 1, 1, 0, 0, 0) if s_month == 12 else datetime(s_year, s_month + 1, 1, 0, 0, 0)
+            df_supp_base = df_f[(df_f["start"] >= sm_start) & (df_f["start"] < sm_end)].copy()
+            label = f"Tháng {s_month}/{s_year}"
             
         df_supp_approved = keep_only_thong_nhat_for_calendar(df_supp_base)
         supp_t = build_support_table_with_status(df_supp_approved)
         
         if supp_t.empty:
-            st.info(f"Không có yêu cầu hỗ trợ nào trong kỳ ({label}).")
+            st.info(f"Không có yêu cầu hỗ trợ nào trong phạm vi ({label}).")
         else:
             n_unassigned = len(supp_t[supp_t["Cảnh báo tiến độ"].str.contains("⚠️")])
             n_urgent = len(supp_t[supp_t["Cảnh báo tiến độ"].str.contains("🚨|🔴")])
@@ -1499,7 +1526,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             c_m3.metric("🚨 Khẩn cấp / Quá hạn", n_urgent)
             
             st.markdown("---")
-            sc_col1, sc_col2 = st.columns([1.5, 2.5])
+            sc_col1, sc_col2 = st.columns([1.6, 2.4])
             with sc_col1:
                 active_staff_select = st.selectbox("👤 Chọn Người thực hiện thao tác:", DANH_MUC_NHAN_SU_HO_TRO, key="active_staff_sel")
                 custom_active_staff = ""
@@ -1507,9 +1534,9 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     custom_active_staff = st.text_input("Nhập tên Người thực hiện:", placeholder="VD: Nguyễn Văn A...", key="active_staff_custom")
                 current_worker = custom_active_staff.strip() if active_staff_select == "Khác" else active_staff_select
 
-            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`. Hệ thống sẽ tự động xóa cảnh báo.")
+            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`. Hệ thống sẽ tự động xóa cảnh báo và giữ nguyên tại tab này.")
 
-            # Danh sách dạng Thẻ tương tác 1-chạm
+            # Danh sách dạng Thẻ tương tác 1-chạm (Font to rõ ràng)
             for idx, r in supp_t.iterrows():
                 sel_id = str(r["ID"]).strip()
                 col_key = r["_col_key"]
@@ -1525,7 +1552,14 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     with c1:
                         st.markdown(f"**📌 ID {sel_id} - {r['Sự kiện']}** ({r['Đơn vị']})")
                         st.write(f"🕒 {r['Ngày giờ']} | 📍 {r['Địa điểm']}")
-                        st.markdown(f"👉 **Hạng mục:** `{r['Hạng mục']}` | **SL:** `{r['Số lượng']}`")
+                        # Làm to chữ Hạng mục và Số lượng nổi bật
+                        st.markdown(
+                            f"<div style='font-size: 16px; font-weight: 700; color: #0b4a7a; margin-top: 4px;'>"
+                            f"👉 Hạng mục: <span style='color: #d97706;'>{r['Hạng mục']}</span> | "
+                            f"SL: <span style='color: #dc2626;'>{r['Số lượng']}</span>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
                         
                     with c2:
                         st.caption("Trạng thái & Cảnh báo:")
@@ -1576,6 +1610,8 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                             
                                         df_ex.loc[mask, status_field] = val_save
                                         if save_onedrive_excel(df_ex):
+                                            # Ép giữ nguyên tab Hỗ trợ không cho nhảy về Dashboard
+                                            st.session_state["menu_tab"] = "Hỗ trợ"
                                             st.session_state["supp_act_msg"] = f"🎉 Đã cập nhật '{r['Hạng mục']}' ID {sel_id} và tự động gỡ cảnh báo!"
                                             st.rerun()
 
