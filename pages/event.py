@@ -91,7 +91,7 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
 # Danh mục nhân sự thực hiện hỗ trợ cố định
 DANH_MUC_NHAN_SU_HO_TRO = [
     "Bùi Quang Chánh",
-    "Đoàn Chánh Linh",
+    "Đoàn Chính Linh",
     "Huỳnh Như",
     "Lê Minh Tâm",
     "Lê Thị Loan",
