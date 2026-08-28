@@ -69,7 +69,7 @@ DANH_MUC_DON_VI_LON = [
 # Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]]
 
-# Danh mục địa điểm cố định trọng điểm
+# Danh mục địa điểm cố định trọng điểm (Đã bổ sung 3 địa điểm sân trường mới)
 DANH_MUC_DIA_DIEM_CO_DINH = [
     "Phòng họp BGH",
     "Phòng Hội thảo",
@@ -752,9 +752,11 @@ def build_support_table_with_status(df_input):
                     is_done = "HOÀN THÀNH" in status_val.upper()
                     
                     alert_tag = "✅ Bình thường"
-                    if not is_assigned and pd.notna(app_time):
+                    # 1. Cảnh báo sau duyệt 24h chưa có người nhận
+                    if not is_assigned and not is_done and pd.notna(app_time):
                         if (now - app_time).total_seconds() > 86400:
                             alert_tag = "⚠️ Chưa có người nhận (>24h duyệt)"
+                    # 2. Cảnh báo khẩn cấp trước 24h bắt đầu chưa hoàn thành
                     if not is_done and pd.notna(start_time):
                         if 0 <= (start_time - now).total_seconds() <= 86400:
                             alert_tag = "🚨 Khẩn: Chưa xong (<24h bắt đầu)"
@@ -779,7 +781,7 @@ def build_support_table_with_status(df_input):
             is_assigned = "ĐÃ NHẬN" in status_val.upper()
             is_done = "HOÀN THÀNH" in status_val.upper()
             alert_tag = "✅ Bình thường"
-            if not is_assigned and pd.notna(app_time) and (now - app_time).total_seconds() > 86400:
+            if not is_assigned and not is_done and pd.notna(app_time) and (now - app_time).total_seconds() > 86400:
                 alert_tag = "⚠️ Chưa có người nhận (>24h duyệt)"
             if not is_done and pd.notna(start_time) and 0 <= (start_time - now).total_seconds() <= 86400:
                 alert_tag = "🚨 Khẩn: Chưa xong (<24h bắt đầu)"
@@ -914,14 +916,14 @@ st.sidebar.write("✅ Đang chọn:", ", ".join(selected))
 df_f = df if "Toàn trường" in selected or df.empty else df[df["donvi_parent"].isin(selected)]
 
 def enforce_menu_access(menu_name):
-    if menu_name not in ["Đăng ký", "Phê duyệt"]:
+    if menu_name not in ["Đăng ký", "Phê duyệt", "Hỗ trợ"]:
         return True
     pwd_key = "admin" if menu_name == "Phê duyệt" else "user"
     state_key = f"{pwd_key}_logged_in"
     if st.session_state.get(state_key, False): return True
-    st.warning(f"Khu vực này yêu cầu mật khẩu {pwd_key.upper()}.")
-    pwd = st.text_input("Nhập mật khẩu", type="password", key=f"{pwd_key}_pwd")
-    if st.button("Đăng nhập", key=f"{pwd_key}_btn"):
+    st.warning(f"Khu vực '{menu_name}' yêu cầu mật khẩu {pwd_key.upper()} để truy cập và xử lý dữ liệu.")
+    pwd = st.text_input("Nhập mật khẩu", type="password", key=f"{pwd_key}_{menu_name}_pwd")
+    if st.button("Đăng nhập", key=f"{pwd_key}_{menu_name}_btn"):
         correct_pwd = st.secrets.get(pwd_key, {}).get("password", "")
         if pwd == correct_pwd and correct_pwd != "":
             st.session_state[state_key] = True
@@ -1463,9 +1465,10 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                                 st.session_state["warn_msg"] = f"🗑️ Đã xóa thành công sự kiện ID {selected_id}! Cảnh báo liên quan đã được gỡ bỏ."
                                                 st.rerun()
         
-    # ================= MỤC HỖ TRỢ & PHÂN CÔNG / XÁC NHẬN TIẾN ĐỘ =================
-    # ================= MỤC HỖ TRỢ & CLICK CHUYỂN TRẠNG THÁI TRỰC TIẾP =================
+    # ================= MỤC HỖ TRỢ (YÊU CẦU MẬT KHẨU USER & TOGGLE 1-CHẠM) =================
     elif menu == "Hỗ trợ":
+        if not enforce_menu_access(menu): st.stop()
+        
         st.markdown('<div class="table-title">🛠️ Bảng điều hành & Phân công nhiệm vụ Hỗ trợ sự kiện</div>', unsafe_allow_html=True)
         if "supp_act_msg" in st.session_state:
             st.success(st.session_state.pop("supp_act_msg"))
@@ -1496,18 +1499,17 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             c_m3.metric("🚨 Khẩn cấp / Quá hạn", n_urgent)
             
             st.markdown("---")
-            # Chọn Người thực hiện mặc định phía trên để khi click nút nhận/hoàn thành sẽ tự động gán tên người này
             sc_col1, sc_col2 = st.columns([1.5, 2.5])
             with sc_col1:
-                active_staff_select = st.selectbox("👤 Chọn Tên người thao tác:", DANH_MUC_NHAN_SU_HO_TRO, key="active_staff_sel")
+                active_staff_select = st.selectbox("👤 Chọn Người thực hiện thao tác:", DANH_MUC_NHAN_SU_HO_TRO, key="active_staff_sel")
                 custom_active_staff = ""
                 if active_staff_select == "Khác":
                     custom_active_staff = st.text_input("Nhập tên Người thực hiện:", placeholder="VD: Nguyễn Văn A...", key="active_staff_custom")
                 current_worker = custom_active_staff.strip() if active_staff_select == "Khác" else active_staff_select
 
-            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút trạng thái ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`.")
+            st.caption("💡 **Hướng dẫn:** Nhấn trực tiếp vào nút thao tác ở từng dòng để chuyển đổi: `Chưa nhận` ➔ `Đã nhận` ➔ `Đã hoàn thành` ➔ `Hoàn tác ban đầu`. Hệ thống sẽ tự động xóa cảnh báo.")
 
-            # Hiển thị danh sách nhiệm vụ dạng thẻ tương tác trực tiếp
+            # Danh sách dạng Thẻ tương tác 1-chạm
             for idx, r in supp_t.iterrows():
                 sel_id = str(r["ID"]).strip()
                 col_key = r["_col_key"]
@@ -1515,7 +1517,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                 raw_status = str(r["Trạng thái thực hiện"])
                 alert_text = str(r["Cảnh báo tiến độ"])
                 
-                # Xác định trạng thái hiện tại
                 is_done = "HOÀN THÀNH" in raw_status.upper()
                 is_received = "ĐÃ NHẬN" in raw_status.upper()
                 
@@ -1540,7 +1541,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
 
                     with c3:
                         st.caption("Thao tác 1-chạm:")
-                        # Logic 3 nấc chuyển đổi khi nhấn
                         if not is_received and not is_done:
                             btn_label = "👉 Nhận nhiệm vụ"
                             btn_type = "primary"
@@ -1556,9 +1556,9 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
 
                         if st.button(btn_label, key=f"btn_toggle_{sel_id}_{col_key}_{idx}", type=btn_type):
                             if not current_worker and next_action != "RESET":
-                                st.error("Vui lòng chọn Tên người thao tác ở góc trên trước khi nhấn!")
+                                st.error("Vui lòng chọn Người thực hiện ở góc trên trước khi nhấn!")
                             else:
-                                with st.spinner("Đang lưu trạng thái..."):
+                                with st.spinner("Đang lưu trạng thái và gỡ cảnh báo..."):
                                     df_ex = read_onedrive_excel()
                                     mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == sel_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(sel_id, errors="coerce"))
                                     
@@ -1572,15 +1572,14 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                         elif next_action == "HOAN_THANH":
                                             val_save = f"HOÀN THÀNH: {current_worker} ({now_str})"
                                         else:
-                                            val_save = "" # Reset về chưa nhận
+                                            val_save = ""
                                             
                                         df_ex.loc[mask, status_field] = val_save
                                         if save_onedrive_excel(df_ex):
-                                            st.session_state["supp_act_msg"] = f"🎉 Đã cập nhật thành công mục '{r['Hạng mục']}' của ID {sel_id}!"
+                                            st.session_state["supp_act_msg"] = f"🎉 Đã cập nhật '{r['Hạng mục']}' ID {sel_id} và tự động gỡ cảnh báo!"
                                             st.rerun()
 
             st.markdown("---")
-            # Nút tải bảng Excel tổng hợp
             disp_table = supp_t.drop(columns=["_col_key"])
             show_table_with_download(f"⬇️ Bảng kê tổng hợp tiến độ hỗ trợ ({label})", disp_table, f"ht_{period}.xlsx", compact=True)
 
