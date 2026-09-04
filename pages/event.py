@@ -155,17 +155,13 @@ SUPPORT_FIELDS_MAP = {
 
 def get_auto_assigned_worker(col_key, location_str=""):
     loc_norm = remove_vietnamese_accents(clean_text(location_str).lower())
-    
     if col_key in ["support_ban_don_tiep", "support_khan_ban"]:
         return "Lê Minh Tâm"
-        
     elif col_key == "support_nuoc_uong":
-        # Bất kể có chữ BGH trong địa điểm -> Lê Thị Loan, còn lại -> Lê Minh Tâm
         if "bgh" in loc_norm:
             return "Lê Thị Loan"
         else:
             return "Lê Minh Tâm"
-            
     elif col_key in ["support_teabreak", "support_hoa_tang", "support_thu_moi"]:
         return "Nguyễn Thị Thoan"
     elif col_key in ["support_khay_bung", "support_le_tan", "support_bia_ky_ket", "support_qua_tang", "support_brochure", "support_mc", "support_kich_ban", "support_dang_tin"]:
@@ -859,6 +855,12 @@ def build_support_table_with_status(df_input):
                     
                     worker_display = parse_worker_name_from_status(status_val)
                     
+                    # Tự động gán hiển thị chuẩn nếu là BGH
+                    loc_norm_r = remove_vietnamese_accents(clean_text(r.get("location", "")).lower())
+                    if col_key == "support_nuoc_uong" and "bgh" in loc_norm_r:
+                        if "Lê Minh Tâm" in worker_display:
+                            worker_display = worker_display.replace("Lê Minh Tâm", "Lê Thị Loan")
+                    
                     rows.append({
                         "ID": item_id,
                         "Sự kiện": r.get("event", ""),
@@ -1170,6 +1172,12 @@ if menu == "Dashboard":
                             st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
                             worker_assigned = parse_worker_name_from_status(st_val_k)
                             
+                            # Tự động gán fallback đúng Lê Thị Loan nếu BGH
+                            loc_norm_r = remove_vietnamese_accents(clean_text(props['panel_location']).lower())
+                            if col_k == "support_nuoc_uong" and "bgh" in loc_norm_r:
+                                if "Lê Minh Tâm" in worker_assigned or worker_assigned == "Chưa nhận nhiệm vụ":
+                                    worker_assigned = "Lê Thị Loan"
+                                    
                             extra_lbl = ""
                             if col_k == "support_bang_dien_tu":
                                 content_led_val = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
@@ -1232,10 +1240,13 @@ if menu == "Dashboard":
                             if st.button(b_lbl, key=f"dash_btn_tg_{ev_id}_{c_key}_{t_idx}", type=b_tp):
                                 with st.spinner("Đang cập nhật trạng thái..."):
                                     df_ex = read_onedrive_excel()
-                                    mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
-                                    if mask.any():
+                                    idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))].tolist()
+                                    if idx_matches:
+                                        row_i = idx_matches[0]
                                         now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-                                        if st_f_name not in df_ex.columns: df_ex[st_f_name] = ""
+                                        if st_f_name not in df_ex.columns:
+                                            df_ex[st_f_name] = ""
+                                        df_ex[st_f_name] = df_ex[st_f_name].astype(object)
                                         
                                         cur_assigned = worker_name.replace("✅", "").strip()
                                         if not cur_assigned or cur_assigned == "Chưa nhận nhiệm vụ":
@@ -1249,7 +1260,7 @@ if menu == "Dashboard":
                                         else:
                                             v_save = ""
                                             
-                                        df_ex.loc[mask, st_f_name] = v_save
+                                        df_ex.at[row_i, st_f_name] = v_save
                                         if save_onedrive_excel(df_ex):
                                             st.session_state["dash_msg"] = f"🎉 Đã cập nhật mục '{task['label']}' thành công!"
                                             st.rerun()
@@ -1260,7 +1271,7 @@ if menu == "Dashboard":
                 st.session_state.selected_event_details = None
                 st.rerun()
                 
-        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD =================
+        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD (ĐÃ SỬA LỖI PANDAS) =================
         with col_act2:
             with st.expander("✏️ Quản trị viên: Điều chỉnh sự kiện"):
                 if not st.session_state.get("admin_logged_in", False):
@@ -1298,11 +1309,10 @@ if menu == "Dashboard":
                     final_de_loc = e_loc_custom.strip() if e_loc_sel == "Khác" else e_loc_sel
                     
                     st.markdown("---")
-                    # ================= KHUNG ĐIỀU CHỈNH THÀNH PHẦN ĐẠI BIỂU ĐẦY ĐỦ NHƯ FORM ĐĂNG KÝ =================
+                    # ================= KHUNG ĐIỀU CHỈNH THÀNH PHẦN ĐẠI BIỂU ĐẦY ĐỦ =================
                     st.markdown("##### 👥 Thành phần Đại biểu tham dự")
                     cur_tp_raw = clean_text(raw_row_data.get("thanh_phan", ""))
                     
-                    # Bóc tách dữ liệu đã chọn từ trước
                     pre_sel_bgh = [b for b in bgh_options_from_onedrive if b in cur_tp_raw]
                     pre_chiefs = "Trưởng các đơn vị thuộc và trực thuộc" in cur_tp_raw
                     pre_all_leaders = "Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)" in cur_tp_raw
@@ -1353,7 +1363,6 @@ if menu == "Dashboard":
                             
                         st.markdown("---")
                         st.markdown("**4. Thành phần Khác**")
-                        # Trích xuất phần chữ khác (nếu có)
                         edit_other_tp = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Khách mời...", key=f"ed_oth_tp_{ev_id}")
 
                     st.markdown("---")
@@ -1401,7 +1410,6 @@ if menu == "Dashboard":
                     
                     if st.button("💾 Lưu các điều chỉnh", type="primary", key=f"btn_save_edit_{ev_id}"):
                         with st.spinner("Đang lưu cập nhật..."):
-                            # Xây dựng lại chuỗi thành phần tham dự chuẩn hóa
                             new_tp_list = []
                             if edit_bgh_sel: new_tp_list.extend(edit_bgh_sel)
                             if edit_chiefs: new_tp_list.append("Trưởng các đơn vị thuộc và trực thuộc")
@@ -1416,23 +1424,37 @@ if menu == "Dashboard":
                             final_tp_updated = "\n".join(new_tp_list) if new_tp_list else cur_tp_raw
                             
                             df_ex = read_onedrive_excel()
-                            mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
-                            if mask.any():
-                                df_ex.loc[mask, "Tên sự kiện"] = e_name.strip()
-                                df_ex.loc[mask, "Đơn vị phụ trách/ tổ chức"] = e_donvi.strip()
-                                df_ex.loc[mask, "Ngày tổ chức"] = e_sd.strftime("%Y-%m-%d")
-                                df_ex.loc[mask, "Giờ bắt đầu"] = e_st.strftime("%H:%M")
-                                df_ex.loc[mask, "Ngày kết thúc"] = e_ed.strftime("%Y-%m-%d")
-                                df_ex.loc[mask, "Giờ kết thúc"] = e_et.strftime("%H:%M")
-                                df_ex.loc[mask, "Địa điểm tổ chức"] = final_de_loc
-                                df_ex.loc[mask, "Thành phần tham dự"] = final_tp_updated
-                                df_ex.loc[mask, "Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = e_supp_flag
+                            idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))].tolist()
+                            if idx_matches:
+                                row_i = idx_matches[0]
                                 
+                                # Gán các trường thông tin chung
+                                df_ex.at[row_i, "Tên sự kiện"] = e_name.strip()
+                                df_ex.at[row_i, "Đơn vị phụ trách/ tổ chức"] = e_donvi.strip()
+                                df_ex.at[row_i, "Ngày tổ chức"] = e_sd.strftime("%Y-%m-%d")
+                                df_ex.at[row_i, "Giờ bắt đầu"] = e_st.strftime("%H:%M")
+                                df_ex.at[row_i, "Ngày kết thúc"] = e_ed.strftime("%Y-%m-%d")
+                                df_ex.at[row_i, "Giờ kết thúc"] = e_et.strftime("%H:%M")
+                                df_ex.at[row_i, "Địa điểm tổ chức"] = final_de_loc
+                                df_ex.at[row_i, "Thành phần tham dự"] = final_tp_updated
+                                
+                                col_supp_name = "Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"
+                                if col_supp_name not in df_ex.columns:
+                                    df_ex[col_supp_name] = ""
+                                df_ex[col_supp_name] = df_ex[col_supp_name].astype(object)
+                                df_ex.at[row_i, col_supp_name] = e_supp_flag
+                                
+                                # Gán an toàn từng trường hỗ trợ
                                 if e_supp_flag == "CÓ":
                                     for k, v in edit_support_vals.items():
                                         col_name = SUPPORT_FIELDS_MAP.get(k, k)
-                                        if k == "noi_dung_bang_dien_tu": col_name = "Nội dung chạy bảng điện tử (nếu có)"
-                                        df_ex.loc[mask, col_name] = v
+                                        if k == "noi_dung_bang_dien_tu":
+                                            col_name = "Nội dung chạy bảng điện tử (nếu có)"
+                                            
+                                        if col_name not in df_ex.columns:
+                                            df_ex[col_name] = ""
+                                        df_ex[col_name] = df_ex[col_name].astype(object)
+                                        df_ex.at[row_i, col_name] = v
                                         
                                 if save_onedrive_excel(df_ex):
                                     st.session_state["dash_msg"] = f"🎉 Đã cập nhật thành công toàn bộ sự kiện ID {ev_id}!"
@@ -1559,6 +1581,7 @@ elif menu == "Đăng ký":
             nguoi_dang_ky = st.text_input("Người đăng ký")
             email = st.text_input("Email")
         
+        # Khởi tạo đầy đủ 29 trường hỗ trợ
         support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_dang_tin, support_may_tinh_chieu, support_livestream, support_chuan_bi_nuoc, support_bao_ve, support_mc, support_kich_ban, support_canh_quan, support_xe_dua_don, support_y_te, support_van_thu, support_khac = 0, "KHÔNG", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "", "KHÔNG", "", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", ""
         
         if support_flag == "CÓ":
@@ -1852,15 +1875,16 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                             if st.button("💾 Lưu điều chỉnh & Tự động gỡ cảnh báo", type="primary"):
                                 with st.spinner("Đang lưu điều chỉnh lên OneDrive..."):
                                     df_ex = read_onedrive_excel()
-                                    mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))
+                                    idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == selected_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(selected_id, errors="coerce"))].tolist()
                                     
-                                    if mask.any():
-                                        df_ex.loc[mask, "Ngày tổ chức"] = new_start_date.strftime("%Y-%m-%d")
-                                        df_ex.loc[mask, "Giờ bắt đầu"] = new_start_time.strftime("%H:%M")
-                                        df_ex.loc[mask, "Ngày kết thúc"] = new_end_date.strftime("%Y-%m-%d")
-                                        df_ex.loc[mask, "Giờ kết thúc"] = new_end_time.strftime("%H:%M")
-                                        df_ex.loc[mask, "Địa điểm tổ chức"] = final_edit_location
-                                        df_ex.loc[mask, "Thành phần tham dự"] = new_thanh_phan.strip()
+                                    if idx_matches:
+                                        row_i = idx_matches[0]
+                                        df_ex.at[row_i, "Ngày tổ chức"] = new_start_date.strftime("%Y-%m-%d")
+                                        df_ex.at[row_i, "Giờ bắt đầu"] = new_start_time.strftime("%H:%M")
+                                        df_ex.at[row_i, "Ngày kết thúc"] = new_end_date.strftime("%Y-%m-%d")
+                                        df_ex.at[row_i, "Giờ kết thúc"] = new_end_time.strftime("%H:%M")
+                                        df_ex.at[row_i, "Địa điểm tổ chức"] = final_edit_location
+                                        df_ex.at[row_i, "Thành phần tham dự"] = new_thanh_phan.strip()
                                         
                                         if save_onedrive_excel(df_ex):
                                             st.session_state["warn_msg"] = f"🎉 Đã cập nhật thành công ID {selected_id}! Hệ thống đã tính toán lại và xóa bỏ cảnh báo."
@@ -1989,12 +2013,14 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                         if st.button(btn_label, key=f"btn_toggle_{sel_id}_{col_key}_{idx}", type=btn_type):
                             with st.spinner("Đang lưu trạng thái và gỡ cảnh báo..."):
                                 df_ex = read_onedrive_excel()
-                                mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == sel_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(sel_id, errors="coerce"))
+                                idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == sel_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(sel_id, errors="coerce"))].tolist()
                                 
-                                if mask.any():
+                                if idx_matches:
+                                    row_i = idx_matches[0]
                                     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
                                     if status_field not in df_ex.columns:
                                         df_ex[status_field] = ""
+                                    df_ex[status_field] = df_ex[status_field].astype(object)
                                         
                                     cur_assigned = worker_name.replace("✅", "").strip()
                                     if not cur_assigned or cur_assigned == "Chưa nhận nhiệm vụ":
@@ -2008,7 +2034,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                     else:
                                         val_save = ""
                                         
-                                    df_ex.loc[mask, status_field] = val_save
+                                    df_ex.at[row_i, status_field] = val_save
                                     if save_onedrive_excel(df_ex):
                                         st.session_state["menu_tab"] = "Hỗ trợ"
                                         st.session_state["supp_act_msg"] = f"🎉 Đã cập nhật '{r['Hạng mục']}' ID {sel_id} và tự động gỡ cảnh báo!"
@@ -2037,7 +2063,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             else:
                 st.warning("Thử lại với: tháng 7, tuần, tháng, hỗ trợ")
 
-# --- PHÊ DUYỆT ---
+# --- PHÊ DUYỆT (TỰ ĐỘNG GÁN NGƯỜI THỰC HIỆN TOÀN BỘ CÁC MỤC HỖ TRỢ) ---
 elif menu == "Phê duyệt":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📋 Phê duyệt sự kiện & Tự động gán người thực hiện hỗ trợ</div>', unsafe_allow_html=True)
@@ -2055,16 +2081,21 @@ elif menu == "Phê duyệt":
             if st.button("✅ PHÊ DUYỆT TẤT CẢ", type="primary"):
                 with st.spinner("Đang phê duyệt và tự động gán phân công..."):
                     df_ex = read_onedrive_excel()
-                    p_ids = pending_df["item_id"].astype(str).str.strip().tolist()
-                    op = "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
                     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    op = "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
                     
                     for _, p_row in pending_df.iterrows():
                         pid = str(p_row["item_id"]).strip()
-                        mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == pid) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(pid, errors="coerce"))
-                        if mask.any():
-                            df_ex.loc[mask, op] = "Thống nhất"
-                            df_ex.loc[mask, "Thời gian hoàn thành"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == pid) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(pid, errors="coerce"))].tolist()
+                        if idx_matches:
+                            row_i = idx_matches[0]
+                            if op not in df_ex.columns: df_ex[op] = ""
+                            df_ex[op] = df_ex[op].astype(object)
+                            df_ex.at[row_i, op] = "Thống nhất"
+                            
+                            if "Thời gian hoàn thành" not in df_ex.columns: df_ex["Thời gian hoàn thành"] = ""
+                            df_ex["Thời gian hoàn thành"] = df_ex["Thời gian hoàn thành"].astype(object)
+                            df_ex.at[row_i, "Thời gian hoàn thành"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             
                             if auto_assign_toggle and is_yes(p_row.get("support", "")):
                                 loc = clean_text(p_row.get("location", ""))
@@ -2084,11 +2115,12 @@ elif menu == "Phê duyệt":
                                         if has_task:
                                             st_col = f"status_{col_k}"
                                             if st_col not in df_ex.columns: df_ex[st_col] = ""
-                                            if not clean_text(df_ex.loc[mask, st_col].values[0]):
-                                                df_ex.loc[mask, st_col] = f"ĐÃ NHẬN: {assigned_worker} ({now_str})"
+                                            df_ex[st_col] = df_ex[st_col].astype(object)
+                                            if not clean_text(df_ex.at[row_i, st_col]):
+                                                df_ex.at[row_i, st_col] = f"ĐÃ NHẬN: {assigned_worker} ({now_str})"
                                                 
                     if save_onedrive_excel(df_ex):
-                        st.session_state["approval_msg"] = f"🎉 Đã phê duyệt {len(p_ids)} sự kiện và tự động gán người thực hiện!"
+                        st.session_state["approval_msg"] = f"🎉 Đã phê duyệt {len(pending_df)} sự kiện và tự động gán người thực hiện!"
                         st.rerun()
 
             show_table_with_download("Danh sách chờ phê duyệt", build_approval_summary_table(pending_df), "cho_duyet.xlsx", compact=True)
@@ -2106,12 +2138,18 @@ elif menu == "Phê duyệt":
                     df_ex = read_onedrive_excel()
                     ap_text = opinion if not reason else f"{opinion}: {reason}"
                     op = "Ý kiến của đơn vị quản lý\n (Phòng Hành chính Tổng hợp)"
-                    mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == id_s) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(id_s, errors="coerce"))
                     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
                     
-                    if mask.any(): 
-                        df_ex.loc[mask, op] = ap_text
-                        df_ex.loc[mask, "Thời gian hoàn thành"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == id_s) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(id_s, errors="coerce"))].tolist()
+                    if idx_matches:
+                        row_i = idx_matches[0]
+                        if op not in df_ex.columns: df_ex[op] = ""
+                        df_ex[op] = df_ex[op].astype(object)
+                        df_ex.at[row_i, op] = ap_text
+                        
+                        if "Thời gian hoàn thành" not in df_ex.columns: df_ex["Thời gian hoàn thành"] = ""
+                        df_ex["Thời gian hoàn thành"] = df_ex["Thời gian hoàn thành"].astype(object)
+                        df_ex.at[row_i, "Thời gian hoàn thành"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
                         if opinion == "Thống nhất" and auto_assign_toggle and is_yes(selected_row.get("support", "")):
                             loc = clean_text(selected_row.get("location", ""))
@@ -2131,12 +2169,13 @@ elif menu == "Phê duyệt":
                                     if has_task:
                                         st_col = f"status_{col_k}"
                                         if st_col not in df_ex.columns: df_ex[st_col] = ""
-                                        if not clean_text(df_ex.loc[mask, st_col].values[0]):
-                                            df_ex.loc[mask, st_col] = f"ĐÃ NHẬN: {assigned_worker} ({now_str})"
+                                        df_ex[st_col] = df_ex[st_col].astype(object)
+                                        if not clean_text(df_ex.at[row_i, st_col]):
+                                            df_ex.at[row_i, st_col] = f"ĐÃ NHẬN: {assigned_worker} ({now_str})"
                                             
-                    if save_onedrive_excel(df_ex):
-                        st.session_state["approval_msg"] = f"🎉 Đã phê duyệt ID {id_s} và tự động phân công hỗ trợ thành công!"
-                        st.rerun()
+                        if save_onedrive_excel(df_ex):
+                            st.session_state["approval_msg"] = f"🎉 Đã phê duyệt ID {id_s} và tự động phân công hỗ trợ thành công!"
+                            st.rerun()
         else: st.success("🎉 Không có sự kiện nào đang chờ phê duyệt.")
 
 # --- LIÊN HỆ & BẢN QUYỀN ---
