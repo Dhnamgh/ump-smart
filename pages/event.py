@@ -158,6 +158,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     if col_key in ["support_ban_don_tiep", "support_khan_ban"]:
         return "Lê Minh Tâm"
     elif col_key == "support_nuoc_uong":
+        # BGH -> Lê Thị Loan, các phòng khác -> Lê Minh Tâm
         if "bgh" in loc_norm:
             return "Lê Thị Loan"
         else:
@@ -181,6 +182,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     elif col_key == "support_van_thu":
         return "Nguyễn Thùy Dương, Nguyễn Thị Hương"
     elif col_key == "support_chuan_bi_nuoc":
+        # Phòng Hội thảo hoặc Hội đồng -> Mai Thị Thu Hà, các nơi khác -> Lê Thị Loan
         if "hoi thao" in loc_norm or "hoi dong" in loc_norm:
             return "Mai Thị Thu Hà"
         else:
@@ -407,7 +409,6 @@ def normalize_location_key(loc_str):
     txt = clean_text(loc_str).lower()
     if not txt or any(online_kw in txt for online_kw in ["trực tuyến", "online", "zoom", "teams", "meet"]):
         return ""
-    
     txt = remove_vietnamese_accents(txt)
     txt = re.sub(r"\s+", " ", txt).strip()
 
@@ -856,17 +857,25 @@ def build_support_table_with_status(df_input):
                     
                     worker_display = parse_worker_name_from_status(status_val)
                     
-                    # Hiển thị dự kiến tên người phụ trách nếu chưa ai nhận
-                    if worker_display == "Chưa nhận nhiệm vụ":
-                        assigned_rule = get_auto_assigned_worker(col_key, loc_str)
-                        if assigned_rule:
-                            worker_display = f"{assigned_rule} (Chưa nhận)"
-                    
-                    # Kiểm tra chuẩn hóa Nước uống tại BGH
+                    # Chuẩn hóa tên nhân sự theo đúng địa điểm hiện tại
                     loc_norm_r = remove_vietnamese_accents(loc_str.lower())
-                    if col_key == "support_nuoc_uong" and "bgh" in loc_norm_r:
-                        if "Lê Minh Tâm" in worker_display:
+                    if col_key == "support_nuoc_uong":
+                        if "bgh" in loc_norm_r:
                             worker_display = worker_display.replace("Lê Minh Tâm", "Lê Thị Loan")
+                            if worker_display == "Chưa nhận nhiệm vụ": worker_display = "Lê Thị Loan"
+                        else:
+                            worker_display = worker_display.replace("Lê Thị Loan", "Lê Minh Tâm")
+                            if worker_display == "Chưa nhận nhiệm vụ": worker_display = "Lê Minh Tâm"
+                    elif col_key == "support_chuan_bi_nuoc":
+                        if "hoi thao" in loc_norm_r or "hoi dong" in loc_norm_r:
+                            worker_display = worker_display.replace("Lê Thị Loan", "Mai Thị Thu Hà")
+                            if worker_display == "Chưa nhận nhiệm vụ": worker_display = "Mai Thị Thu Hà"
+                        else:
+                            worker_display = worker_display.replace("Mai Thị Thu Hà", "Lê Thị Loan")
+                            if worker_display == "Chưa nhận nhiệm vụ": worker_display = "Lê Thị Loan"
+                    elif worker_display == "Chưa nhận nhiệm vụ":
+                        assigned_rule = get_auto_assigned_worker(col_key, loc_str)
+                        if assigned_rule: worker_display = assigned_rule
                     
                     rows.append({
                         "ID": item_id,
@@ -1168,11 +1177,11 @@ if menu == "Dashboard":
                 for col_k, col_label in SUPPORT_FIELDS_MAP.items():
                     if col_k in raw_row_data:
                         val_k = raw_row_data[col_k]
-                        if col_k == "support_bang_dien_tu":
+                        if col_key_val := (col_k == "support_bang_dien_tu"):
                             qty_k = 2 if is_yes(val_k) or (clean_text(val_k) and clean_text(val_k).upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]) else 0
                         elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_chuan_bi_nuoc", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu"]:
-                            txt_k = clean_text(val_k)
-                            qty_k = 1 if is_yes(txt_k) or (txt_k and txt_k.upper() not in ["KHÔNG", "NONE", "N/A", "0"]) else 0
+                            txt_val = clean_text(val_k)
+                            qty_k = 1 if is_yes(txt_val) or (txt_val and txt_val.upper() not in ["KHÔNG", "NONE", "N/A", "0"]) else 0
                         else:
                             qty_k = count_value(val_k)
                             
@@ -1181,17 +1190,25 @@ if menu == "Dashboard":
                             st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
                             worker_assigned = parse_worker_name_from_status(st_val_k)
                             
-                            # Tự động gán fallback theo ma trận nếu chưa có ai nhận
-                            assigned_by_rule = get_auto_assigned_worker(col_k, cur_location_ev)
-                            if worker_assigned == "Chưa nhận nhiệm vụ":
-                                if assigned_by_rule:
-                                    worker_assigned = f"{assigned_by_rule}"
-                                    
-                            # Tự động chuyển đúng Lê Thị Loan nếu địa điểm có BGH
+                            # Tự động đồng bộ chuẩn xác người phụ thuộc vào địa điểm
                             loc_norm_r = remove_vietnamese_accents(cur_location_ev.lower())
-                            if col_k == "support_nuoc_uong" and "bgh" in loc_norm_r:
-                                if "Lê Minh Tâm" in worker_assigned:
+                            if col_k == "support_nuoc_uong":
+                                if "bgh" in loc_norm_r:
                                     worker_assigned = worker_assigned.replace("Lê Minh Tâm", "Lê Thị Loan")
+                                    if worker_assigned == "Chưa nhận nhiệm vụ": worker_assigned = "Lê Thị Loan"
+                                else:
+                                    worker_assigned = worker_assigned.replace("Lê Thị Loan", "Lê Minh Tâm")
+                                    if worker_assigned == "Chưa nhận nhiệm vụ": worker_assigned = "Lê Minh Tâm"
+                            elif col_k == "support_chuan_bi_nuoc":
+                                if "hoi thao" in loc_norm_r or "hoi dong" in loc_norm_r:
+                                    worker_assigned = worker_assigned.replace("Lê Thị Loan", "Mai Thị Thu Hà")
+                                    if worker_assigned == "Chưa nhận nhiệm vụ": worker_assigned = "Mai Thị Thu Hà"
+                                else:
+                                    worker_assigned = worker_assigned.replace("Mai Thị Thu Hà", "Lê Thị Loan")
+                                    if worker_assigned == "Chưa nhận nhiệm vụ": worker_assigned = "Lê Thị Loan"
+                            elif worker_display := (worker_assigned == "Chưa nhận nhiệm vụ"):
+                                assigned_rule = get_auto_assigned_worker(col_k, cur_location_ev)
+                                if assigned_rule: worker_assigned = assigned_rule
                                     
                             extra_lbl = ""
                             if col_k == "support_bang_dien_tu":
@@ -1263,10 +1280,10 @@ if menu == "Dashboard":
                                             df_ex[st_f_name] = ""
                                         df_ex[st_f_name] = df_ex[st_f_name].astype(object)
                                         
-                                        cur_assigned = worker_name.replace("✅", "").replace("(Chưa nhận)", "").strip()
-                                        if not cur_assigned or cur_assigned == "Chưa nhận nhiệm vụ":
-                                            cur_assigned = get_auto_assigned_worker(c_key, cur_location_ev)
-                                            if not cur_assigned: cur_assigned = "Nhân viên hỗ trợ"
+                                        # Lấy chính xác tên người phụ trách chuẩn theo địa điểm
+                                        cur_assigned = get_auto_assigned_worker(c_key, cur_location_ev)
+                                        if not cur_assigned:
+                                            cur_assigned = worker_name.replace("✅", "").strip()
                                             
                                         if nxt == "NHAN":
                                             v_save = f"ĐÃ NHẬN: {cur_assigned} ({now_str})"
@@ -1487,17 +1504,28 @@ if menu == "Dashboard":
                                                 has_task = count_value(v) > 0
                                                 
                                             if has_task:
-                                                # Nếu mục chưa nhận hoặc bị đổi địa điểm -> cập nhật gán tự động
                                                 assigned_person = get_auto_assigned_worker(k, final_de_loc)
                                                 cur_status_cell = clean_text(df_ex.at[row_i, st_col])
-                                                if not cur_status_cell or "Chưa nhận" in cur_status_cell:
-                                                    df_ex.at[row_i, st_col] = f"ĐÃ NHẬN: {assigned_person} ({now_str})"
-                                                elif k in ["support_nuoc_uong", "support_chuan_bi_nuoc"]:
-                                                    # Tự động đồng bộ đổi người nếu thay đổi địa điểm BGH / Hội thảo
-                                                    if "ĐÃ NHẬN:" in cur_status_cell:
+                                                
+                                                if k == "support_nuoc_uong":
+                                                    # Bắt buộc gán đúng người theo địa điểm mới
+                                                    loc_chk = remove_vietnamese_accents(final_de_loc.lower())
+                                                    target_person = "Lê Thị Loan" if "bgh" in loc_chk else "Lê Minh Tâm"
+                                                    if "HOÀN THÀNH" in cur_status_cell:
+                                                        df_ex.at[row_i, st_col] = f"HOÀN THÀNH: {target_person} ({now_str})"
+                                                    else:
+                                                        df_ex.at[row_i, st_col] = f"ĐÃ NHẬN: {target_person} ({now_str})"
+                                                elif k == "support_chuan_bi_nuoc":
+                                                    loc_chk = remove_vietnamese_accents(final_de_loc.lower())
+                                                    target_person = "Mai Thị Thu Hà" if ("hoi thao" in loc_chk or "hoi dong" in loc_chk) else "Lê Thị Loan"
+                                                    if "HOÀN THÀNH" in cur_status_cell:
+                                                        df_ex.at[row_i, st_col] = f"HOÀN THÀNH: {target_person} ({now_str})"
+                                                    else:
+                                                        df_ex.at[row_i, st_col] = f"ĐÃ NHẬN: {target_person} ({now_str})"
+                                                else:
+                                                    if not cur_status_cell or "Chưa nhận" in cur_status_cell:
                                                         df_ex.at[row_i, st_col] = f"ĐÃ NHẬN: {assigned_person} ({now_str})"
                                             else:
-                                                # Nếu chỉnh về 0 hoặc KHÔNG -> xóa trạng thái
                                                 df_ex.at[row_i, st_col] = ""
                                         
                                 if save_onedrive_excel(df_ex):
@@ -1625,7 +1653,6 @@ elif menu == "Đăng ký":
             nguoi_dang_ky = st.text_input("Người đăng ký")
             email = st.text_input("Email")
         
-        # Khởi tạo đầy đủ 29 trường hỗ trợ
         support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_dang_tin, support_may_tinh_chieu, support_livestream, support_chuan_bi_nuoc, support_bao_ve, support_mc, support_kich_ban, support_canh_quan, support_xe_dua_don, support_y_te, support_van_thu, support_khac = 0, "KHÔNG", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "", "KHÔNG", "", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", ""
         
         if support_flag == "CÓ":
@@ -1724,7 +1751,7 @@ elif menu == "Đăng ký":
                     new_row["Cảnh quan - VS"] = support_canh_quan
                     new_row["Xe đưa đón đại biểu"] = support_xe_dua_don
                     new_row["Y tế"] = support_y_te
-                    new_row["Văn thư (CV, đóng dấu,...)"] = support_van_thu
+                    new_row["Văn thư (CV, đóng dấu,...)" ] = support_van_thu
                     new_row["Các yêu cầu khác (nếu có)"] = support_khac
                     new_row["Thành phần tham dự"] = final_thanh_phan
                     
@@ -2066,10 +2093,9 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                                         df_ex[status_field] = ""
                                     df_ex[status_field] = df_ex[status_field].astype(object)
                                         
-                                    cur_assigned = worker_name.replace("✅", "").replace("(Chưa nhận)", "").strip()
-                                    if not cur_assigned or cur_assigned == "Chưa nhận nhiệm vụ":
-                                        cur_assigned = get_auto_assigned_worker(col_key, r['Địa điểm'])
-                                        if not cur_assigned: cur_assigned = "Nhân viên hỗ trợ"
+                                    cur_assigned = get_auto_assigned_worker(col_key, r['Địa điểm'])
+                                    if not cur_assigned:
+                                        cur_assigned = worker_name.replace("✅", "").strip()
                                         
                                     if next_action == "NHAN":
                                         val_save = f"ĐÃ NHẬN: {cur_assigned} ({now_str})"
