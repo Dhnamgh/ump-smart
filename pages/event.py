@@ -17,14 +17,11 @@ st.set_page_config(layout="wide")
 
 # Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
 DANH_MUC_DON_VI_LON = [
-    # Lãnh đạo & Tổ chức chính trị - xã hội
     "Đảng ủy",
     "Ban Giám hiệu",
     "Công đoàn",
     "Đoàn TN - Hội SV",
     "HĐ Khoa học - Đào tạo",
-
-    # 11 Phòng chức năng
     "P. Hành chính Tổng hợp",
     "P. Tổ chức Cán bộ",
     "P. Hợp tác Quốc tế",
@@ -36,8 +33,6 @@ DANH_MUC_DON_VI_LON = [
     "P. Thanh tra - Pháp chế",
     "P. ĐBCLGD & KT",
     "P. Kế hoạch Tài chính",
-
-    # 07 Đơn vị đào tạo
     "Trường Y",
     "Trường Dược",
     "Trường ĐD-KTYH",
@@ -45,28 +40,21 @@ DANH_MUC_DON_VI_LON = [
     "Khoa Y tế Công cộng",
     "Khoa Y học Cổ truyền",
     "Khoa Khoa học Cơ bản",
-
-    # 02 Đơn vị Khám, chữa bệnh
     "Bệnh viện ĐHYD TPHCM",
     "Phòng khám chuyên khoa RHM",
-
-    # 06 Trung tâm
     "TT. Kiểm chuẩn CL XNYH",
     "TT. Đào tạo NL theo NCXH",
     "TT. Công nghệ thông tin",
     "TT. KHCN UMP",
     "TT. Giáo dục Y học",
     "TT. Y sinh học phân tử",
-
-    # 03 Đơn vị khác
     "Thư viện",
     "Ký túc xá",
     "Tạp chí Y học TPHCM",
-    
     "Khác"
 ]
 
-# Danh mục đơn vị phục vụ chọn đơn vị tham dự (Đã bổ sung Tổ dự án ERP)
+# Danh mục đơn vị phục vụ chọn đơn vị tham dự
 DANH_MUC_DON_VI_THAM_DU = [d for d in DANH_MUC_DON_VI_LON if d not in ["Ban Giám hiệu", "Khác"]] + ["Tổ dự án ERP"]
 
 # Danh sách thành viên mặc định của Tổ dự án ERP
@@ -79,6 +67,7 @@ THANH_VIEN_ERP_MAC_DINH = [
     "Nguyễn Thành Luân",
     "Ngô Hán Chiêu"
 ]
+ERP_DISPLAY_TEXT = "Tổ dự án ERP: " + ", ".join(THANH_VIEN_ERP_MAC_DINH)
 
 # Danh mục địa điểm cố định trọng điểm
 DANH_MUC_DIA_DIEM_CO_DINH = [
@@ -154,7 +143,6 @@ SUPPORT_FIELDS_MAP = {
 }
 
 def count_attendees_from_text(thanh_phan_text):
-    """Tính toán ước tính số người tham dự từ chuỗi thành phần tham dự"""
     txt = clean_text(thanh_phan_text)
     if not txt:
         return 5
@@ -164,7 +152,7 @@ def count_attendees_from_text(thanh_phan_text):
         if line.startswith("Tổ dự án ERP:") or line.startswith("Đơn vị:"):
             parts = line.split(":", 1)[1].split(",")
             count += len([p for p in parts if p.strip()])
-        elif " - " in line:  # Đại biểu dạng chức vụ
+        elif " - " in line:
             count += 1
         else:
             parts = re.split(r"[,;]+", line)
@@ -497,7 +485,7 @@ def check_delegate_conflict(tp_text_a, tp_text_b, leader_names_list):
     
     for ia in items_a:
         for ib in items_b:
-            if ia == ib or (len(ia.split()) >= 2 and ia in ib) or (len(ib.split()) >= 2 and ib in ia):
+            if ia == ib or (len(ia.split()) >= 2 and ia in ib) or (len(ib.split()) >= 2 and ia in ib):
                 if ia not in [normalize_person_name(c) for c in conflicts]:
                     conflicts.append(ia.title())
                     
@@ -627,7 +615,7 @@ def send_notification_email(event_name, donvi, start_dt, location):
     except Exception: return False
 
 # ==============================================================================
-# 3. KẾT NỐI ONEDRIVE (SỰ KIỆN & UMP_LEADER.XLSX)
+# 3. KẾT NỐI ONEDRIVE
 # ==============================================================================
 def get_azure_token():
     azure_cfg = st.secrets["azure_ogsm"]
@@ -843,7 +831,6 @@ def build_support_table_with_status(df_input):
         
         has_detail = False
         for col_key, label in SUPPORT_FIELDS_MAP.items():
-            # BGH, Hội thảo, Hội đồng: Ẩn Số lượng nước uống (chỉ dùng Chuẩn bị nước)
             if (is_bgh_room or is_hoi_thao_or_dong) and col_key == "support_nuoc_uong":
                 continue
                 
@@ -853,7 +840,6 @@ def build_support_table_with_status(df_input):
                     qty = 2 if is_yes(raw_val) or (clean_text(raw_val) and clean_text(raw_val).upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]) else 0
                 elif col_key == "support_chuan_bi_nuoc":
                     if is_bgh_room:
-                        # Mặc định = số người tham dự
                         qty = count_attendees_from_text(thanh_phan_r)
                     else:
                         water_qty = count_value(r.get("support_nuoc_uong", 0))
@@ -865,6 +851,8 @@ def build_support_table_with_status(df_input):
                 elif col_key in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu"]:
                     txt_val = clean_text(raw_val)
                     qty = 1 if is_yes(txt_val) or (txt_val and txt_val.upper() not in ["KHÔNG", "NONE", "N/A", "0"]) else 0
+                elif col_key == "support_khan_ban":
+                    qty = 1 if is_yes(raw_val) else 0
                 else:
                     qty = count_value(raw_val)
                     
@@ -893,7 +881,6 @@ def build_support_table_with_status(df_input):
                     
                     worker_display = parse_worker_name_from_status(status_val)
                     
-                    # Chuẩn hóa phân công theo địa điểm
                     if col_key == "support_nuoc_uong":
                         if "bgh" in loc_norm_r:
                             worker_display = worker_display.replace("Lê Minh Tâm", "Lê Thị Loan")
@@ -912,6 +899,9 @@ def build_support_table_with_status(df_input):
                         assigned_rule = get_auto_assigned_worker(col_key, loc_str)
                         if assigned_rule: worker_display = assigned_rule
                     
+                    # Trải khăn bàn không hiển thị SL
+                    display_qty = "" if col_key == "support_khan_ban" else qty
+                    
                     rows.append({
                         "ID": item_id,
                         "Sự kiện": r.get("event", ""),
@@ -919,7 +909,7 @@ def build_support_table_with_status(df_input):
                         "Ngày giờ": start_time.strftime("%d/%m/%Y %H:%M") if pd.notna(start_time) else "",
                         "Địa điểm": loc_str,
                         "Hạng mục": f"{label}{extra_note}",
-                        "Số lượng": qty,
+                        "Số lượng": display_qty,
                         "Người thực hiện": worker_display,
                         "Cảnh báo tiến độ": alert_tag,
                         "_col_key": col_key,
@@ -971,13 +961,11 @@ if "reg_start_date" not in st.session_state: st.session_state.reg_start_date = t
 if "reg_end_date" not in st.session_state: st.session_state.reg_end_date = today.date()
 if "reg_prev_start_date" not in st.session_state: st.session_state.reg_prev_start_date = st.session_state.reg_start_date
 
-# 1. Đếm số lượng chờ duyệt
 num_pending = 0
 if not df.empty:
     num_pending = len(df[df.apply(approval_text_from_row, axis=1) == ""])
 phe_duyet_label = f"Phê duyệt 🔴 {num_pending}" if num_pending > 0 else "Phê duyệt"
 
-# 2. Đếm số lượng xung đột thực tế
 num_conflicts = 0
 if not df.empty:
     now_ts = datetime.now()
@@ -993,7 +981,6 @@ if not df.empty:
 
 canh_bao_label = f"Cảnh báo 🔴 {num_conflicts}" if num_conflicts > 0 else "Cảnh báo"
 
-# 3. Đếm cảnh báo trễ hạn hỗ trợ
 num_support_alerts = 0
 if not df.empty:
     supp_approved_df = keep_only_thong_nhat_for_calendar(df)
@@ -1003,7 +990,6 @@ if not df.empty:
 
 ho_tro_label = f"Hỗ trợ 🟡 {num_support_alerts}" if num_support_alerts > 0 else "Hỗ trợ"
 
-# Menu Sidebar
 menu_options = ["Dashboard", "Đăng ký", "Báo cáo", canh_bao_label, ho_tro_label, "Truy vấn AI", phe_duyet_label, "Liên hệ"]
 
 curr_menu_idx = 0
@@ -1179,6 +1165,9 @@ if menu == "Dashboard":
 
         val_thanh_phan = clean_text(props.get("panel_participants", "")) or clean_text(raw_row_data.get("thanh_phan", ""))
         if val_thanh_phan:
+            # Tự động chuyển đổi nếu có dòng Tổ dự án ERP
+            if "Tổ dự án ERP" in val_thanh_phan and ":" not in val_thanh_phan:
+                val_thanh_phan = val_thanh_phan.replace("Tổ dự án ERP", ERP_DISPLAY_TEXT)
             tp_display = val_thanh_phan.replace("\n", "<br>")
             details_html += f'<div class="details-item"><span class="details-label">👥 Thành phần:</span><br><span style="font-weight:700; color:#334155;">{tp_display}</span></div>'
 
@@ -1188,7 +1177,6 @@ if menu == "Dashboard":
         details_html += "</div>"
         st.markdown(details_html, unsafe_allow_html=True)
 
-        # Nếu có yêu cầu Hỗ trợ -> BẮT BUỘC ĐĂNG NHẬP USER MỚI HIỂN THỊ HẠNG MỤC
         if is_yes(props['panel_support_text']):
             st.markdown('<div class="table-title">🛠️ Danh sách hạng mục cần hỗ trợ & Trạng thái thực hiện</div>', unsafe_allow_html=True)
             
@@ -1214,7 +1202,6 @@ if menu == "Dashboard":
                 thanh_phan_r = clean_text(raw_row_data.get("thanh_phan", ""))
                 
                 for col_k, col_label in SUPPORT_FIELDS_MAP.items():
-                    # Ẩn nước uống tại BGH, Hội thảo, Hội đồng
                     if (is_bgh_room or is_hoi_thao_or_dong) and col_k == "support_nuoc_uong":
                         continue
                         
@@ -1232,6 +1219,8 @@ if menu == "Dashboard":
                                     qty_k = water_qty_reg if water_qty_reg > 0 else (cb_qty if cb_qty > 0 else 1)
                                 else:
                                     qty_k = cb_qty
+                        elif col_k == "support_khan_ban":
+                            qty_k = 1 if is_yes(val_k) else 0
                         elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu"]:
                             txt_val = clean_text(val_k)
                             qty_k = 1 if is_yes(txt_val) or (txt_val and txt_val.upper() not in ["KHÔNG", "NONE", "N/A", "0"]) else 0
@@ -1243,7 +1232,6 @@ if menu == "Dashboard":
                             st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
                             worker_assigned = parse_worker_name_from_status(st_val_k)
                             
-                            # Tự động đồng bộ chuẩn xác người phụ thuộc vào địa điểm
                             if col_k == "support_nuoc_uong":
                                 if "bgh" in loc_norm_r:
                                     worker_assigned = worker_assigned.replace("Lê Minh Tâm", "Lê Thị Loan")
@@ -1297,13 +1285,21 @@ if menu == "Dashboard":
                     with st.container(border=True):
                         tc1, tc2, tc3 = st.columns([2.6, 1.8, 1.2])
                         with tc1:
-                            st.markdown(
-                                f"<div style='font-size: 16px; font-weight: 700; color: #0f172a;'>"
-                                f"👉 Hạng mục: <span style='color: #d97706;'>{task['label']}</span> | "
-                                f"SL: <span style='color: #dc2626;'>{task['qty']}</span>"
-                                f"</div>",
-                                unsafe_allow_html=True
-                            )
+                            if c_key == "support_khan_ban":
+                                st.markdown(
+                                    f"<div style='font-size: 16px; font-weight: 700; color: #0f172a;'>"
+                                    f"👉 Hạng mục: <span style='color: #d97706;'>{task['label']}</span>"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.markdown(
+                                    f"<div style='font-size: 16px; font-weight: 700; color: #0f172a;'>"
+                                    f"👉 Hạng mục: <span style='color: #d97706;'>{task['label']}</span> | "
+                                    f"SL: <span style='color: #dc2626;'>{task['qty']}</span>"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
                         with tc2:
                             st.caption("Người thực hiện:")
                             if is_task_done:
@@ -1372,8 +1368,17 @@ if menu == "Dashboard":
                     
                     e_name = st.text_input("Tên sự kiện:", value=clean_text(raw_row_data.get("event", "")), key=f"de_name_{ev_id}")
                     
-                    cur_donvi = clean_text(raw_row_data.get("donvi", ""))
-                    e_donvi = st.text_input("Đơn vị phụ trách/tổ chức:", value=cur_donvi, key=f"de_donvi_{ev_id}")
+                    # 1. Điều chỉnh Đơn vị phụ trách với danh sách tìm kiếm chuẩn hóa
+                    cur_donvi_raw = clean_text(raw_row_data.get("donvi", ""))
+                    cur_parent = extract_parent_donvi(cur_donvi_raw)
+                    sub_unit = ""
+                    if " - " in cur_donvi_raw:
+                        sub_unit = cur_donvi_raw.split(" - ", 1)[1].strip()
+                        
+                    p_idx = DANH_MUC_DON_VI_LON.index(cur_parent) if cur_parent in DANH_MUC_DON_VI_LON else 0
+                    edit_donvi_lon = st.selectbox("Đơn vị lớn phụ trách/tổ chức:", DANH_MUC_DON_VI_LON, index=p_idx, key=f"de_dvlon_{ev_id}")
+                    edit_bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có):", value=sub_unit, key=f"de_bomon_{ev_id}")
+                    final_edit_donvi = f"{edit_donvi_lon} - {edit_bomon_to.strip()}" if edit_bomon_to.strip() else edit_donvi_lon
                     
                     de_c1, de_c2 = st.columns(2)
                     with de_c1:
@@ -1383,20 +1388,30 @@ if menu == "Dashboard":
                         e_ed = st.date_input("Ngày kết thúc:", value=ev_e_date.date() if pd.notna(ev_e_date) else e_sd, key=f"de_ed_{ev_id}")
                         e_et = st.time_input("Giờ kết thúc:", value=ev_e_date.time() if pd.notna(ev_e_date) else time(11, 0), key=f"de_et_{ev_id}")
                         
-                    current_loc = clean_text(raw_row_data.get("location", ""))
-                    loc_idx = DANH_MUC_DIA_DIEM_CO_DINH.index(current_loc) if current_loc in DANH_MUC_DIA_DIEM_CO_DINH else (len(DANH_MUC_DIA_DIEM_CO_DINH) - 1)
-                    e_loc_sel = st.selectbox("Địa điểm:", DANH_MUC_DIA_DIEM_CO_DINH, index=loc_idx, key=f"de_loc_{ev_id}")
-                    e_loc_custom = ""
-                    if e_loc_sel == "Khác":
-                        e_loc_custom = st.text_input("Địa điểm chi tiết:", value=current_loc if current_loc not in DANH_MUC_DIA_DIEM_CO_DINH else "", key=f"de_loc_c_{ev_id}")
-                    final_de_loc = e_loc_custom.strip() if e_loc_sel == "Khác" else e_loc_sel
+                    # 2. Điều chỉnh Địa điểm với multiselect cho phép chọn nhiều nơi
+                    cur_loc_raw = clean_text(raw_row_data.get("location", ""))
+                    cur_locs_list = [loc.strip() for loc in cur_loc_raw.split(",") if loc.strip()]
+                    pre_sel_locs = [loc for loc in cur_locs_list if loc in DANH_MUC_DIA_DIEM_CO_DINH]
+                    other_loc_text = ", ".join([loc for loc in cur_locs_list if loc not in DANH_MUC_DIA_DIEM_CO_DINH])
+                    if other_loc_text and "Khác" not in pre_sel_locs:
+                        pre_sel_locs.append("Khác")
+
+                    edit_locs_sel = st.multiselect("Địa điểm tổ chức (chọn một hoặc nhiều):", DANH_MUC_DIA_DIEM_CO_DINH, default=pre_sel_locs, key=f"de_loc_multi_{ev_id}")
+                    edit_loc_custom = ""
+                    if "Khác" in edit_locs_sel:
+                        edit_loc_custom = st.text_input("Nhập các địa điểm cụ thể khác (ngăn cách bằng dấu phẩy):", value=other_loc_text, key=f"de_loc_c_{ev_id}")
+                    
+                    final_locs = [l for l in edit_locs_sel if l != "Khác"]
+                    if "Khác" in edit_locs_sel and edit_loc_custom.strip():
+                        final_locs.extend([l.strip() for l in edit_loc_custom.split(",") if l.strip()])
+                    final_de_loc = ", ".join(final_locs) if final_locs else "Chưa xác định"
                     
                     loc_norm_edit = remove_vietnamese_accents(final_de_loc.lower())
                     is_bgh_edit = "bgh" in loc_norm_edit
                     is_ht_or_hd_edit = ("hoi thao" in loc_norm_edit or "hoi dong" in loc_norm_edit)
                     
                     st.markdown("---")
-                    # ================= KHUNG ĐIỀU CHỈNH THÀNH PHẦN ĐẠI BIỂU ĐẦY ĐỦ =================
+                    # ================= KHUNG ĐIỀU CHỈNH THÀNH PHẦN ĐẠI BIỂU (ERP TINH GỌN) =================
                     st.markdown("##### 👥 Thành phần Đại biểu tham dự")
                     cur_tp_raw = clean_text(raw_row_data.get("thanh_phan", ""))
                     
@@ -1404,7 +1419,6 @@ if menu == "Dashboard":
                     pre_chiefs = "Trưởng các đơn vị thuộc và trực thuộc" in cur_tp_raw
                     pre_all_leaders = "Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)" in cur_tp_raw
                     pre_erp = "Tổ dự án ERP" in cur_tp_raw
-                    pre_erp_mems = [m for m in THANH_VIEN_ERP_MAC_DINH if m in cur_tp_raw] if pre_erp else THANH_VIEN_ERP_MAC_DINH
                     
                     pre_donvi_cust = []
                     for d in DANH_MUC_DON_VI_THAM_DU:
@@ -1437,16 +1451,8 @@ if menu == "Dashboard":
                             default=pre_donvi_cust,
                             key=f"ed_cmdv_{ev_id}"
                         )
-                        
-                        edit_erp_mems = []
                         if "Tổ dự án ERP" in edit_custom_dv:
-                            st.markdown("📌 **Thành phần Tổ dự án ERP tham dự (bấm dấu x để xóa thành viên vắng):**")
-                            edit_erp_mems = st.multiselect(
-                                "Danh sách nhân sự Tổ dự án ERP:",
-                                options=THANH_VIEN_ERP_MAC_DINH,
-                                default=pre_erp_mems if pre_erp_mems else THANH_VIEN_ERP_MAC_DINH,
-                                key=f"ed_erpm_{ev_id}"
-                            )
+                            st.caption("ℹ️ Đã chọn **Tổ dự án ERP** (danh sách 7 thành viên sẽ tự động hiển thị trên Dashboard).")
                             
                         st.markdown("---")
                         st.markdown("**4. Thành phần Khác**")
@@ -1463,27 +1469,19 @@ if menu == "Dashboard":
                         es_col1, es_col2, es_col3 = st.columns(3)
                         with es_col1:
                             edit_support_vals["support_ban_don_tiep"] = st.number_input("Bàn đón tiếp", min_value=0, value=count_value(raw_row_data.get("support_ban_don_tiep", 0)), step=1, key=f"ed_ban_{ev_id}")
-                            edit_support_vals["support_khan_ban"] = st.selectbox("Trải khăn bàn", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_khan_ban", "")) else 0, key=f"ed_khan_{ev_id}")
+                            edit_support_vals["support_khan_ban"] = st.selectbox("Trải khăn bàn hội trường", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_khan_ban", "")) else 0, key=f"ed_khan_{ev_id}")
                             edit_support_vals["support_le_tan"] = st.number_input("Số lượng lễ tân", min_value=0, value=count_value(raw_row_data.get("support_le_tan", 0)), step=1, key=f"ed_letan_{ev_id}")
                             edit_support_vals["support_bang_ten"] = st.number_input("Bảng tên mica", min_value=0, value=count_value(raw_row_data.get("support_bang_ten", 0)), step=1, key=f"ed_bangten_{ev_id}")
                             edit_support_vals["support_bia_ky_ket"] = st.number_input("Bìa ký kết", min_value=0, value=count_value(raw_row_data.get("support_bia_ky_ket", 0)), step=1, key=f"ed_bia_{ev_id}")
                             
-                            # Ẩn Số lượng nước uống nếu là Phòng họp BGH hoặc Hội thảo / Hội đồng
+                            # Ẩn Số lượng nước uống nếu là BGH hoặc Hội thảo / Hội đồng
                             if not (is_bgh_edit or is_ht_or_hd_edit):
                                 edit_support_vals["support_nuoc_uong"] = st.number_input("Số lượng nước uống", min_value=0, value=count_value(raw_row_data.get("support_nuoc_uong", 0)), step=1, key=f"ed_nuoc_{ev_id}")
                             else:
                                 edit_support_vals["support_nuoc_uong"] = 0
-                                st.info("ℹ️ Phòng họp BGH/Hội thảo/Hội đồng có sẵn nước, chỉ đăng ký Chuẩn bị nước.")
                             
                             # Chuẩn bị nước
-                            if is_bgh_edit:
-                                cur_attendees = count_attendees_from_text(cur_tp_raw)
-                                edit_support_vals["support_chuan_bi_nuoc"] = st.number_input("Chuẩn bị nước (SL mặc định = số người)", min_value=0, value=cur_attendees, step=1, key=f"ed_cbnuoc_bgh_{ev_id}")
-                            elif is_ht_or_hd_edit:
-                                edit_support_vals["support_chuan_bi_nuoc"] = st.number_input("Chuẩn bị nước (SL phần nước)", min_value=0, value=count_value(raw_row_data.get("support_chuan_bi_nuoc", 1)), step=1, key=f"ed_cbnuoc_qty_{ev_id}")
-                            else:
-                                edit_support_vals["support_chuan_bi_nuoc"] = st.selectbox("Chuẩn bị nước", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_chuan_bi_nuoc", "")) else 0, key=f"ed_cbnuoc_{ev_id}")
-                            
+                            edit_support_vals["support_chuan_bi_nuoc"] = st.selectbox("Chuẩn bị nước", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_chuan_bi_nuoc", "")) else 0, key=f"ed_cbnuoc_{ev_id}")
                             edit_support_vals["support_bao_ve"] = st.selectbox("Bảo vệ", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_bao_ve", "")) else 0, key=f"ed_bv_{ev_id}")
                             edit_support_vals["support_dang_tin"] = st.selectbox("Đăng tin truyền thông", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_dang_tin", "")) else 0, key=f"ed_dangtin_{ev_id}")
                             edit_support_vals["support_y_te"] = st.selectbox("Y tế", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_y_te", "")) else 0, key=f"ed_yte_{ev_id}")
@@ -1520,7 +1518,7 @@ if menu == "Dashboard":
                             other_dv_sel = [d for d in edit_custom_dv if d != "Tổ dự án ERP"]
                             if other_dv_sel: new_tp_list.append("Đơn vị: " + ", ".join(other_dv_sel))
                             if "Tổ dự án ERP" in edit_custom_dv:
-                                new_tp_list.append("Tổ dự án ERP: " + ", ".join(edit_erp_mems))
+                                new_tp_list.append(ERP_DISPLAY_TEXT)
                                 
                             if edit_other_tp.strip(): new_tp_list.append(edit_other_tp.strip())
                             final_tp_updated = "\n".join(new_tp_list) if new_tp_list else cur_tp_raw
@@ -1532,7 +1530,7 @@ if menu == "Dashboard":
                                 now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
                                 
                                 df_ex.at[row_i, "Tên sự kiện"] = e_name.strip()
-                                df_ex.at[row_i, "Đơn vị phụ trách/ tổ chức"] = e_donvi.strip()
+                                df_ex.at[row_i, "Đơn vị phụ trách/ tổ chức"] = final_edit_donvi
                                 df_ex.at[row_i, "Ngày tổ chức"] = e_sd.strftime("%Y-%m-%d")
                                 df_ex.at[row_i, "Giờ bắt đầu"] = e_st.strftime("%H:%M")
                                 df_ex.at[row_i, "Ngày kết thúc"] = e_ed.strftime("%Y-%m-%d")
@@ -1566,7 +1564,7 @@ if menu == "Dashboard":
                                             has_task = False
                                             if k == "support_bang_dien_tu":
                                                 has_task = is_yes(v)
-                                            elif k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu"]:
+                                            elif k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu", "support_khan_ban"]:
                                                 has_task = is_yes(v) or (clean_text(v) and clean_text(v).upper() not in ["KHÔNG", "NONE", "N/A", "0"])
                                             elif k == "support_chuan_bi_nuoc":
                                                 has_task = is_yes(v) or (count_value(v) > 0)
@@ -1634,7 +1632,7 @@ if menu == "Dashboard":
     c2.metric("Tháng", sum(1 for d in event_dates_for_stats if d.month == today.month and d.year == today.year))
     c3.metric("Năm", sum(1 for d in event_dates_for_stats if d.year == today.year))
 
-# --- ĐĂNG KÝ ---
+# --- ĐĂNG KÝ (CHỌN NHIỀU ĐỊA ĐIỂM & ERP TINH GỌN) ---
 elif menu == "Đăng ký":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📝 Đăng ký sự kiện</div>', unsafe_allow_html=True)
@@ -1690,15 +1688,8 @@ elif menu == "Đăng ký":
             options=DANH_MUC_DON_VI_THAM_DU,
             default=[]
         )
-        
-        erp_members_selected = []
         if "Tổ dự án ERP" in selected_custom_donvi:
-            st.markdown("📌 **Thành phần Tổ dự án ERP tham dự (bấm dấu x để xóa thành viên vắng):**")
-            erp_members_selected = st.multiselect(
-                "Danh sách nhân sự Tổ dự án ERP:",
-                options=THANH_VIEN_ERP_MAC_DINH,
-                default=THANH_VIEN_ERP_MAC_DINH
-            )
+            st.caption("ℹ️ Đã chọn **Tổ dự án ERP** (danh sách 7 thành viên sẽ tự động hiển thị trên Dashboard).")
 
         st.markdown("---")
         st.markdown("**4. Thành phần Khác**")
@@ -1713,29 +1704,26 @@ elif menu == "Đăng ký":
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
-            dia_diem_select = st.selectbox("Địa điểm tổ chức", DANH_MUC_DIA_DIEM_CO_DINH)
+            # Chọn nhiều địa điểm tổ chức
+            dia_diem_select_list = st.multiselect("Địa điểm tổ chức (chọn một hoặc nhiều)", DANH_MUC_DIA_DIEM_CO_DINH, default=["Phòng họp BGH"])
             dia_diem_khac = ""
-            if dia_diem_select == "Khác":
-                dia_diem_khac = st.text_input("Nhập địa điểm cụ thể (nếu chọn Khác)", placeholder="Ví dụ: Phòng 402 nhà A, Trực tuyến Zoom...")
+            if "Khác" in dia_diem_select_list:
+                dia_diem_khac = st.text_input("Nhập địa điểm cụ thể khác (ngăn cách bằng dấu phẩy):", placeholder="Ví dụ: Phòng 402 nhà A, Trực tuyến Zoom...")
             
             nguoi_phu_trach = st.text_input("Người phụ trách")
             nguoi_dang_ky = st.text_input("Người đăng ký")
             email = st.text_input("Email")
         
-        final_loc_preview = dia_diem_khac.strip() if dia_diem_select == "Khác" else dia_diem_select
+        # Nhận diện địa điểm
+        final_selected_locs = [l for l in dia_diem_select_list if l != "Khác"]
+        if "Khác" in dia_diem_select_list and dia_diem_khac.strip():
+            final_selected_locs.extend([l.strip() for l in dia_diem_khac.split(",") if l.strip()])
+        final_loc_preview = ", ".join(final_selected_locs) if final_selected_locs else "Chưa xác định"
+        
         loc_norm_preview = remove_vietnamese_accents(final_loc_preview.lower())
         is_bgh_room_reg = "bgh" in loc_norm_preview
         is_hoi_thao_or_dong_reg = ("hoi thao" in loc_norm_preview or "hoi dong" in loc_norm_preview)
         
-        # Đếm tạm thời số lượng người tham dự đã chọn ở khung trên
-        tentative_tp_count = 0
-        tentative_tp_count += len(bgh_selected) if 'bgh_selected' in locals() else 0
-        if 'erp_members_selected' in locals() and "Tổ dự án ERP" in selected_custom_donvi:
-            tentative_tp_count += len(erp_members_selected)
-        if 'chiefs_opt' in locals() and chiefs_opt: tentative_tp_count += 3
-        if 'all_leaders_opt' in locals() and all_leaders_opt: tentative_tp_count += 6
-        if tentative_tp_count <= 0: tentative_tp_count = 5
-
         support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_dang_tin, support_may_tinh_chieu, support_livestream, support_chuan_bi_nuoc, support_bao_ve, support_mc, support_kich_ban, support_canh_quan, support_xe_dua_don, support_y_te, support_van_thu, support_khac = 0, "KHÔNG", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "", "KHÔNG", "", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", ""
         
         if support_flag == "CÓ":
@@ -1748,21 +1736,14 @@ elif menu == "Đăng ký":
                 support_bang_ten = st.number_input("Số lượng bảng tên (mica)", min_value=0, step=1)
                 support_bia_ky_ket = st.number_input("Số lượng bìa ký kết", min_value=0, step=1)
                 
-                # Ẩn Số lượng nước uống nếu là Phòng họp BGH hoặc Hội thảo / Hội đồng
+                # Ẩn Số lượng nước uống nếu là BGH hoặc Hội thảo / Hội đồng
                 if not (is_bgh_room_reg or is_hoi_thao_or_dong_reg):
                     support_nuoc_uong = st.number_input("Số lượng nước uống", min_value=0, step=1)
                 else:
                     support_nuoc_uong = 0
-                    st.info("ℹ️ Phòng họp BGH/Hội thảo/Hội đồng có sẵn nước, chỉ đăng ký Chuẩn bị nước.")
                     
                 # Chuẩn bị nước
-                if is_bgh_room_reg:
-                    support_chuan_bi_nuoc = st.number_input("Chuẩn bị nước (SL mặc định = số người tham dự)", min_value=0, step=1, value=tentative_tp_count)
-                elif is_hoi_thao_or_dong_reg:
-                    support_chuan_bi_nuoc = st.number_input("Chuẩn bị nước (SL phần nước)", min_value=0, step=1, value=10)
-                else:
-                    support_chuan_bi_nuoc = st.selectbox("Chuẩn bị nước", ["KHÔNG", "CÓ"])
-                    
+                support_chuan_bi_nuoc = st.selectbox("Chuẩn bị nước", ["KHÔNG", "CÓ"])
                 support_bao_ve = st.selectbox("Bảo vệ", ["KHÔNG", "CÓ"])
                 support_dang_tin = st.selectbox("Đăng tin truyền thông", ["KHÔNG", "CÓ"])
                 support_y_te = st.selectbox("Y tế", ["KHÔNG", "CÓ"])
@@ -1792,8 +1773,7 @@ elif menu == "Đăng ký":
         submitted = st.form_submit_button("Gửi đăng ký")
 
     if submitted:
-        final_location = dia_diem_khac.strip() if dia_diem_select == "Khác" else dia_diem_select
-        if not event_name or not donvi_lon or not final_location: 
+        if not event_name or not donvi_lon or not final_loc_preview or final_loc_preview == "Chưa xác định": 
             st.error("Vui lòng nhập tối thiểu: Tên sự kiện, Đơn vị và Địa điểm.")
         else:
             with st.spinner("Đang lưu sự kiện..."):
@@ -1807,7 +1787,7 @@ elif menu == "Đăng ký":
                 other_donvi = [d for d in selected_custom_donvi if d != "Tổ dự án ERP"]
                 if other_donvi: thanh_phan_list.append("Đơn vị: " + ", ".join(other_donvi))
                 if "Tổ dự án ERP" in selected_custom_donvi:
-                    thanh_phan_list.append("Tổ dự án ERP: " + ", ".join(erp_members_selected))
+                    thanh_phan_list.append(ERP_DISPLAY_TEXT)
                     
                 if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
                 final_thanh_phan = "\n".join(thanh_phan_list)
@@ -1818,7 +1798,7 @@ elif menu == "Đăng ký":
                     valid_ids = pd.to_numeric(df_excel["Id"], errors="coerce").dropna()
                     next_id = int(valid_ids.max() + 1) if not valid_ids.empty else 1
                     new_row = {col: None for col in df_excel.columns}
-                    new_row["Id"], new_row["Thời gian bắt đầu"], new_row["Email"], new_row["Tên"], new_row["Đơn vị phụ trách/ tổ chức"], new_row["Tên sự kiện"], new_row["Ngày tổ chức"], new_row["Giờ bắt đầu"], new_row["Giờ kết thúc"], new_row["Ngày kết thúc"], new_row["Địa điểm tổ chức"], new_row["Thông tin người phụ trách"], new_row["Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = next_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), email, nguoi_dang_ky, donvi_display, event_name, start_date.strftime("%Y-%m-%d"), start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), end_date.strftime("%Y-%m-%d"), final_location, nguoi_phu_trach, support_flag
+                    new_row["Id"], new_row["Thời gian bắt đầu"], new_row["Email"], new_row["Tên"], new_row["Đơn vị phụ trách/ tổ chức"], new_row["Tên sự kiện"], new_row["Ngày tổ chức"], new_row["Giờ bắt đầu"], new_row["Giờ kết thúc"], new_row["Ngày kết thúc"], new_row["Địa điểm tổ chức"], new_row["Thông tin người phụ trách"], new_row["Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = next_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), email, nguoi_dang_ky, donvi_display, event_name, start_date.strftime("%Y-%m-%d"), start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), end_date.strftime("%Y-%m-%d"), final_loc_preview, nguoi_phu_trach, support_flag
                     
                     new_row["Số lượng bàn đón tiếp"] = support_ban_don_tiep
                     new_row["Cần trải khăn bàn hội trường"] = support_khan_ban
@@ -1853,7 +1833,7 @@ elif menu == "Đăng ký":
                     new_row["Thành phần tham dự"] = final_thanh_phan
                     
                     if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
-                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), final_location)
+                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), final_loc_preview)
                         st.session_state["approval_msg"] = f"🎉 Đăng ký thành công ID {next_id}! Đợi duyệt. Kết quả sẽ hiện trên Dashboard Lịch sau khi duyệt."
                         st.rerun()
 
@@ -1991,7 +1971,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                 st.info("🔒 Chức năng Điều chỉnh / Xóa sự kiện chỉ dành cho Quản trị viên (Admin).")
                 with st.expander("🔑 Đăng nhập quyền Admin để xử lý"):
                     admin_pwd = st.text_input("Nhập mật khẩu Admin", type="password", key="warn_admin_pwd")
-                    if st.button("Xác nhận quyền Admin", key="warn_admin_btn"):
+                    if st.button("Xác nhận quyền Admin", key="warn_admin_btn_conf"):
                         correct_admin_pwd = st.secrets.get("admin", {}).get("password", "")
                         if admin_pwd == correct_admin_pwd and correct_admin_pwd != "":
                             st.session_state["admin_logged_in"] = True
@@ -2027,16 +2007,22 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                         with ec2:
                             st.markdown("**📍 Địa điểm & 👥 Thành phần:**")
                             current_loc = row_edit.get("location", "")
-                            loc_idx = DANH_MUC_DIA_DIEM_CO_DINH.index(current_loc) if current_loc in DANH_MUC_DIA_DIEM_CO_DINH else (len(DANH_MUC_DIA_DIEM_CO_DINH) - 1)
-                            
-                            edit_loc_select = st.selectbox("Địa điểm tổ chức mới", DANH_MUC_DIA_DIEM_CO_DINH, index=loc_idx, key="edit_loc_sel")
+                            cur_loc_tokens = [l.strip() for l in current_loc.split(",") if l.strip()]
+                            pre_chk = [l for l in cur_loc_tokens if l in DANH_MUC_DIA_DIEM_CO_DINH]
+                            other_t = ", ".join([l for l in cur_loc_tokens if l not in DANH_MUC_DIA_DIEM_CO_DINH])
+                            if other_t and "Khác" not in pre_chk: pre_chk.append("Khác")
+
+                            edit_loc_select = st.multiselect("Địa điểm tổ chức mới", DANH_MUC_DIA_DIEM_CO_DINH, default=pre_chk, key="edit_loc_sel_conf")
                             edit_loc_custom = ""
-                            if edit_loc_select == "Khác":
-                                edit_loc_custom = st.text_input("Nhập địa điểm cụ thể", value=current_loc if current_loc not in DANH_MUC_DIA_DIEM_CO_DINH else "", key="edit_loc_custom")
+                            if "Khác" in edit_loc_select:
+                                edit_loc_custom = st.text_input("Nhập địa điểm cụ thể", value=other_t, key="edit_loc_custom_conf")
                                 
                             new_thanh_phan = st.text_area("Thành phần tham dự (Xóa bớt hoặc đổi tên đại biểu bị trùng):", value=row_edit.get("thanh_phan", ""), height=120, key="edit_tp")
 
-                        final_edit_location = edit_loc_custom.strip() if edit_loc_select == "Khác" else edit_loc_select
+                        final_c_locs = [l for l in edit_loc_select if l != "Khác"]
+                        if "Khác" in edit_loc_select and edit_loc_custom.strip():
+                            final_c_locs.extend([l.strip() for l in edit_loc_custom.split(",") if l.strip()])
+                        final_edit_location = ", ".join(final_c_locs) if final_c_locs else "Chưa xác định"
 
                         btn_c1, btn_c2 = st.columns([1.5, 1])
                         with btn_c1:
@@ -2143,13 +2129,21 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                     with c1:
                         st.markdown(f"**📌 ID {sel_id} - {r['Sự kiện']}** ({r['Đơn vị']})")
                         st.write(f"🕒 {r['Ngày giờ']} | 📍 {r['Địa điểm']}")
-                        st.markdown(
-                            f"<div style='font-size: 16px; font-weight: 700; color: #0b4a7a; margin-top: 4px;'>"
-                            f"👉 Hạng mục: <span style='color: #d97706;'>{r['Hạng mục']}</span> | "
-                            f"SL: <span style='color: #dc2626;'>{r['Số lượng']}</span>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
+                        if col_key == "support_khan_ban":
+                            st.markdown(
+                                f"<div style='font-size: 16px; font-weight: 700; color: #0b4a7a; margin-top: 4px;'>"
+                                f"👉 Hạng mục: <span style='color: #d97706;'>{r['Hạng mục']}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(
+                                f"<div style='font-size: 16px; font-weight: 700; color: #0b4a7a; margin-top: 4px;'>"
+                                f"👉 Hạng mục: <span style='color: #d97706;'>{r['Hạng mục']}</span> | "
+                                f"SL: <span style='color: #dc2626;'>{r['Số lượng']}</span>"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
                         
                     with c2:
                         st.caption("Người thực hiện & Cảnh báo:")
@@ -2280,7 +2274,7 @@ elif menu == "Phê duyệt":
                                         has_task = False
                                         if col_k == "support_bang_dien_tu":
                                             has_task = is_yes(raw_val) or (clean_text(raw_val) and clean_text(raw_val).upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"])
-                                        elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu"]:
+                                        elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu", "support_khan_ban"]:
                                             txt_val = clean_text(raw_val)
                                             has_task = is_yes(txt_val) or (txt_val and txt_val.upper() not in ["KHÔNG", "NONE", "N/A", "0"])
                                         elif col_k == "support_chuan_bi_nuoc":
@@ -2343,7 +2337,7 @@ elif menu == "Phê duyệt":
                                     has_task = False
                                     if col_k == "support_bang_dien_tu":
                                         has_task = is_yes(raw_val) or (clean_text(raw_val) and clean_text(raw_val).upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"])
-                                    elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu"]:
+                                    elif col_k in ["support_bandroll_standee", "support_backdrop", "support_khac", "support_dang_tin", "support_may_tinh_chieu", "support_livestream", "support_bao_ve", "support_mc", "support_kich_ban", "support_canh_quan", "support_xe_dua_don", "support_y_te", "support_van_thu", "support_khan_ban"]:
                                         txt_val = clean_text(raw_val)
                                         has_task = is_yes(txt_val) or (txt_val and txt_val.upper() not in ["KHÔNG", "NONE", "N/A", "0"])
                                     elif col_k == "support_chuan_bi_nuoc":
