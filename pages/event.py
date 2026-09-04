@@ -154,14 +154,18 @@ SUPPORT_FIELDS_MAP = {
 }
 
 def get_auto_assigned_worker(col_key, location_str=""):
-    loc_norm = clean_text(location_str).lower()
+    loc_norm = remove_vietnamese_accents(clean_text(location_str).lower())
+    
     if col_key in ["support_ban_don_tiep", "support_khan_ban"]:
         return "Lê Minh Tâm"
+        
     elif col_key == "support_nuoc_uong":
-        if "bgh" in loc_norm or "phòng họp bgh" in loc_norm:
+        # Bất kể có chữ BGH trong địa điểm -> Lê Thị Loan, còn lại -> Lê Minh Tâm
+        if "bgh" in loc_norm:
             return "Lê Thị Loan"
         else:
             return "Lê Minh Tâm"
+            
     elif col_key in ["support_teabreak", "support_hoa_tang", "support_thu_moi"]:
         return "Nguyễn Thị Thoan"
     elif col_key in ["support_khay_bung", "support_le_tan", "support_bia_ky_ket", "support_qua_tang", "support_brochure", "support_mc", "support_kich_ban", "support_dang_tin"]:
@@ -181,7 +185,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     elif col_key == "support_van_thu":
         return "Nguyễn Thùy Dương, Nguyễn Thị Hương"
     elif col_key == "support_chuan_bi_nuoc":
-        if "hội thảo" in loc_norm or "hội đồng" in loc_norm or "hoi thao" in loc_norm or "hoi dong" in loc_norm:
+        if "hoi thao" in loc_norm or "hoi dong" in loc_norm:
             return "Mai Thị Thu Hà"
         else:
             return "Lê Thị Loan"
