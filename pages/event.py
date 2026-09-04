@@ -153,7 +153,6 @@ SUPPORT_FIELDS_MAP = {
     "support_khac": "Các yêu cầu khác"
 }
 
-# Ma trận phân công tự động khi phê duyệt
 def get_auto_assigned_worker(col_key, location_str=""):
     loc_norm = clean_text(location_str).lower()
     if col_key in ["support_ban_don_tiep", "support_khan_ban"]:
@@ -339,6 +338,7 @@ div[data-baseweb="notification"] div,
 .details-item { font-size: 16px; color: #1e293b; margin-bottom: 8px; line-height: 1.45; font-weight: 600; }
 .details-label { font-size: 16px; font-weight: 800; color: #0f172a; }
 .details-val { font-size: 16px; font-weight: 700; color: #0b4a7a; }
+.details-support-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-top: 14px; margin-bottom: 8px; }
 
 .stButton>button { width: auto; font-size: 13px !important; }
 
@@ -983,7 +983,8 @@ def enforce_menu_access(menu_name):
         if pwd == correct_pwd and correct_pwd != "":
             st.session_state[state_key] = True
             st.rerun()
-        else: st.error("Mật khẩu không chính xác!")
+        else:
+            st.error("Mật khẩu không chính xác!")
     return False
 
 # ==============================================================================
@@ -1232,7 +1233,6 @@ if menu == "Dashboard":
                                         now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
                                         if st_f_name not in df_ex.columns: df_ex[st_f_name] = ""
                                         
-                                        # Lấy tên đã được gán hoặc mặc định theo bảng phân công
                                         cur_assigned = worker_name.replace("✅", "").strip()
                                         if not cur_assigned or cur_assigned == "Chưa nhận nhiệm vụ":
                                             cur_assigned = get_auto_assigned_worker(c_key, props['panel_location'])
@@ -1294,10 +1294,64 @@ if menu == "Dashboard":
                     final_de_loc = e_loc_custom.strip() if e_loc_sel == "Khác" else e_loc_sel
                     
                     st.markdown("---")
-                    st.markdown("##### 👥 Điều chỉnh Thành phần Đại biểu tham dự:")
+                    # ================= KHUNG ĐIỀU CHỈNH THÀNH PHẦN ĐẠI BIỂU ĐẦY ĐỦ NHƯ FORM ĐĂNG KÝ =================
+                    st.markdown("##### 👥 Thành phần Đại biểu tham dự")
                     cur_tp_raw = clean_text(raw_row_data.get("thanh_phan", ""))
-                    e_tp = st.text_area("Thành phần tham dự (có thể thêm/xóa tên đại biểu hoặc tổ ERP):", value=cur_tp_raw, height=120, key=f"de_tp_{ev_id}")
                     
+                    # Bóc tách dữ liệu đã chọn từ trước
+                    pre_sel_bgh = [b for b in bgh_options_from_onedrive if b in cur_tp_raw]
+                    pre_chiefs = "Trưởng các đơn vị thuộc và trực thuộc" in cur_tp_raw
+                    pre_all_leaders = "Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)" in cur_tp_raw
+                    pre_erp = "Tổ dự án ERP" in cur_tp_raw
+                    pre_erp_mems = [m for m in THANH_VIEN_ERP_MAC_DINH if m in cur_tp_raw] if pre_erp else THANH_VIEN_ERP_MAC_DINH
+                    
+                    pre_donvi_cust = []
+                    for d in DANH_MUC_DON_VI_THAM_DU:
+                        if d == "Tổ dự án ERP":
+                            if pre_erp: pre_donvi_cust.append(d)
+                        elif d in cur_tp_raw:
+                            pre_donvi_cust.append(d)
+                    
+                    with st.container(border=True):
+                        st.markdown("**1. Ban Giám hiệu**")
+                        edit_all_bgh = st.checkbox("Chọn tất cả Ban Giám hiệu (3 thành viên)", value=len(pre_sel_bgh) == len(bgh_options_from_onedrive), key=f"ed_bgh_all_{ev_id}")
+                        if edit_all_bgh:
+                            edit_bgh_sel = st.multiselect("Danh sách BGH tham dự:", options=bgh_options_from_onedrive, default=bgh_options_from_onedrive, key=f"ed_bgh_m1_{ev_id}")
+                        else:
+                            edit_bgh_sel = st.multiselect("Chọn từng thành viên BGH:", options=bgh_options_from_onedrive, default=pre_sel_bgh, key=f"ed_bgh_m2_{ev_id}")
+                            
+                        st.markdown("---")
+                        st.markdown("**2. Lãnh đạo các đơn vị trực thuộc**")
+                        ed_c1, ed_c2 = st.columns(2)
+                        with ed_c1:
+                            edit_chiefs = st.checkbox("Trưởng các đơn vị thuộc và trực thuộc", value=pre_chiefs, key=f"ed_chf_{ev_id}")
+                        with ed_c2:
+                            edit_all_leaders = st.checkbox("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)", value=pre_all_leaders, key=f"ed_aldr_{ev_id}")
+                            
+                        st.markdown("---")
+                        st.markdown("**3. Chọn Đơn vị tham dự cụ thể (gõ tìm kiếm)**")
+                        edit_custom_dv = st.multiselect(
+                            "Gõ tên để tìm nhanh đơn vị tham dự (Khoa / Phòng / Trung tâm / Bệnh viện / Tổ dự án ERP):",
+                            options=DANH_MUC_DON_VI_THAM_DU,
+                            default=pre_donvi_cust,
+                            key=f"ed_cmdv_{ev_id}"
+                        )
+                        
+                        edit_erp_mems = []
+                        if "Tổ dự án ERP" in edit_custom_dv:
+                            st.markdown("📌 **Thành phần Tổ dự án ERP tham dự (bấm dấu x để xóa thành viên vắng):**")
+                            edit_erp_mems = st.multiselect(
+                                "Danh sách nhân sự Tổ dự án ERP:",
+                                options=THANH_VIEN_ERP_MAC_DINH,
+                                default=pre_erp_mems if pre_erp_mems else THANH_VIEN_ERP_MAC_DINH,
+                                key=f"ed_erpm_{ev_id}"
+                            )
+                            
+                        st.markdown("---")
+                        st.markdown("**4. Thành phần Khác**")
+                        # Trích xuất phần chữ khác (nếu có)
+                        edit_other_tp = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Khách mời...", key=f"ed_oth_tp_{ev_id}")
+
                     st.markdown("---")
                     st.markdown("##### 🛠️ Điều chỉnh các Hạng mục Hỗ trợ:")
                     cur_supp_flag = is_yes(raw_row_data.get("support", ""))
@@ -1343,6 +1397,20 @@ if menu == "Dashboard":
                     
                     if st.button("💾 Lưu các điều chỉnh", type="primary", key=f"btn_save_edit_{ev_id}"):
                         with st.spinner("Đang lưu cập nhật..."):
+                            # Xây dựng lại chuỗi thành phần tham dự chuẩn hóa
+                            new_tp_list = []
+                            if edit_bgh_sel: new_tp_list.extend(edit_bgh_sel)
+                            if edit_chiefs: new_tp_list.append("Trưởng các đơn vị thuộc và trực thuộc")
+                            if edit_all_leaders: new_tp_list.append("Lãnh đạo các đơn vị thuộc và trực thuộc (Trưởng và Phó)")
+                            
+                            other_dv_sel = [d for d in edit_custom_dv if d != "Tổ dự án ERP"]
+                            if other_dv_sel: new_tp_list.append("Đơn vị: " + ", ".join(other_dv_sel))
+                            if "Tổ dự án ERP" in edit_custom_dv:
+                                new_tp_list.append("Tổ dự án ERP: " + ", ".join(edit_erp_mems))
+                                
+                            if edit_other_tp.strip(): new_tp_list.append(edit_other_tp.strip())
+                            final_tp_updated = "\n".join(new_tp_list) if new_tp_list else cur_tp_raw
+                            
                             df_ex = read_onedrive_excel()
                             mask = (df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))
                             if mask.any():
@@ -1353,7 +1421,7 @@ if menu == "Dashboard":
                                 df_ex.loc[mask, "Ngày kết thúc"] = e_ed.strftime("%Y-%m-%d")
                                 df_ex.loc[mask, "Giờ kết thúc"] = e_et.strftime("%H:%M")
                                 df_ex.loc[mask, "Địa điểm tổ chức"] = final_de_loc
-                                df_ex.loc[mask, "Thành phần tham dự"] = e_tp.strip()
+                                df_ex.loc[mask, "Thành phần tham dự"] = final_tp_updated
                                 df_ex.loc[mask, "Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = e_supp_flag
                                 
                                 if e_supp_flag == "CÓ":
@@ -1487,7 +1555,6 @@ elif menu == "Đăng ký":
             nguoi_dang_ky = st.text_input("Người đăng ký")
             email = st.text_input("Email")
         
-        # Khởi tạo đầy đủ 29 trường hỗ trợ
         support_ban_don_tiep, support_khan_ban, support_le_tan, support_bang_ten, support_bia_ky_ket, support_nuoc_uong, support_teabreak, support_hoa_ban, support_hoa_buc, support_hoa_tang, support_qua_tang, support_brochure, support_khay_bung, support_bandroll_standee, support_backdrop, support_bang_dien_tu, noi_dung_bang_dien_tu, support_thu_moi, support_dang_tin, support_may_tinh_chieu, support_livestream, support_chuan_bi_nuoc, support_bao_ve, support_mc, support_kich_ban, support_canh_quan, support_xe_dua_don, support_y_te, support_van_thu, support_khac = 0, "KHÔNG", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "", "KHÔNG", "", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", "KHÔNG", ""
         
         if support_flag == "CÓ":
@@ -1966,7 +2033,7 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
             else:
                 st.warning("Thử lại với: tháng 7, tuần, tháng, hỗ trợ")
 
-# --- PHÊ DUYỆT (TỰ ĐỘNG GÁN NGƯỜI THỰC HIỆN TOÀN BỘ CÁC MỤC HỖ TRỢ) ---
+# --- PHÊ DUYỆT ---
 elif menu == "Phê duyệt":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📋 Phê duyệt sự kiện & Tự động gán người thực hiện hỗ trợ</div>', unsafe_allow_html=True)
