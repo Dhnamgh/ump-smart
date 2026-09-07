@@ -130,7 +130,7 @@ st.markdown("""
 
 # ================= PHẦN CODE XỬ LÝ CHÍNH CỦA APP ĐIỂM DANH BẮT ĐẦU TỪ ĐÂY =================
 
-CLASS_LIST = ["D26A", "D26C", "KTHA26", "Y26", "RHM26", "YTCC26", "YHDP26", "DD26", "PHR26", "ĐD26", "XN26", "PHCN26"]
+CLASS_LIST = ["D26A", "D26C", "KTHA26"]
 MAX_ALLOWED_RADIUS = 150.0 
 ALLOWED_IP_PREFIXES = ["103.180.97.", "118.69.1.", "203.162.1.", "171.244.1."]
 
