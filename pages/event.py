@@ -1122,32 +1122,51 @@ if menu == "Dashboard":
         cur_date = s.date()
         end_date = e.date()
         
+        # Kiểm tra xem sự kiện có bao trùm cả ngày (kéo dài qua buổi chiều) hay không
+        is_full_day_span = (cur_date < end_date) or (s.hour <= 8 and e.hour >= 13) or (not has_time)
+        
         while cur_date <= end_date:
-            if has_time:
-                cur_s = datetime.combine(cur_date, s.time())
-                cur_e = datetime.combine(cur_date, e.time())
+            daily_sessions = []
+            
+            if is_full_day_span:
+                # Nếu là ngày đầu tiên mà bắt đầu sau 12:00 -> Chỉ có buổi chiều
+                if cur_date == s.date() and s.hour >= 12:
+                    daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
+                # Nếu là ngày cuối cùng mà kết thúc trước 12:00 -> Chỉ có buổi sáng
+                elif cur_date == end_date and e.hour < 12 and e.hour > 0:
+                    daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
+                else:
+                    # Các trường hợp cả ngày: tự động sinh cả Sáng và Chiều
+                    daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
+                    daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
+            else:
+                daily_sessions.append((s.time(), e.time(), s.strftime("%H:%M") if has_time else "Cả ngày"))
+                
+            for sess_s, sess_e, sess_lbl in daily_sessions:
+                cur_s = datetime.combine(cur_date, sess_s)
+                cur_e = datetime.combine(cur_date, sess_e)
                 start_str = cur_s.strftime("%Y-%m-%d %H:%M")
                 end_str = cur_e.strftime("%Y-%m-%d %H:%M")
-                panel_time_label = f"{start_str} - {cur_e.strftime('%H:%M')}"
-            else:
-                start_str = cur_date.strftime("%Y-%m-%d")
-                end_str = cur_date.strftime("%Y-%m-%d")
-                panel_time_label = start_str
+                sess_title = f"{prefix_icon}{sess_lbl} - {event_name_str}" + (f"\n📍 {location}" if location else "")
                 
-            events.append({
-                "title": title, "start": start_str, "end": end_str,
-                "backgroundColor": color, "borderColor": "#B91C1C" if is_holiday else color, "textColor": text_color,
-                "extendedProps": {
-                    "item_id": str(r.get("item_id", "")).strip(),
-                    "panel_event_title": event_name_str,
-                    "panel_donvi": clean_text(r.get("donvi", "")),
-                    "panel_location": location,
-                    "panel_time_label": panel_time_label,
-                    "panel_participants": clean_text(r.get("thanh_phan", "")),
-                    "panel_support_text": clean_text(r.get("support", "")),
-                    "raw_row_data_json_string": event_raw_data_json_string
-                }
-            })
+                events.append({
+                    "title": sess_title, 
+                    "start": start_str, 
+                    "end": end_str,
+                    "backgroundColor": color, 
+                    "borderColor": "#B91C1C" if is_holiday else color, 
+                    "textColor": text_color,
+                    "extendedProps": {
+                        "item_id": str(r.get("item_id", "")).strip(),
+                        "panel_event_title": event_name_str,
+                        "panel_donvi": clean_text(r.get("donvi", "")),
+                        "panel_location": location,
+                        "panel_time_label": f"{start_str} - {cur_e.strftime('%H:%M')}",
+                        "panel_participants": clean_text(r.get("thanh_phan", "")),
+                        "panel_support_text": clean_text(r.get("support", "")),
+                        "raw_row_data_json_string": event_raw_data_json_string
+                    }
+                })
             event_dates_for_stats.append(datetime.combine(cur_date, time(0, 0)))
             cur_date += timedelta(days=1)
 
