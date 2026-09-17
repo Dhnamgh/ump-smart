@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time, date
 from streamlit_calendar import calendar
 import plotly.express as px
 import re
@@ -69,7 +69,7 @@ THANH_VIEN_ERP_MAC_DINH = [
 ]
 ERP_DISPLAY_TEXT = "Tổ dự án ERP: " + ", ".join(THANH_VIEN_ERP_MAC_DINH)
 
-# Danh mục địa điểm cố định trọng điểm
+# Danh mục địa điểm cố định trọng điểm (ĐÃ BỔ SUNG CÁC GIẢNG ĐƯỜNG MỚI)
 DANH_MUC_DIA_DIEM_CO_DINH = [
     "Phòng họp BGH",
     "Phòng Hội thảo",
@@ -84,6 +84,16 @@ DANH_MUC_DIA_DIEM_CO_DINH = [
     "Giảng đường 1",
     "Giảng đường 2",
     "Giảng đường AB",
+    # Giảng đường tầng 4
+    "Giảng đường 4A1", "Giảng đường 4A2", "Giảng đường 4B1", "Giảng đường 4B2", "Giảng đường 4C", "Giảng đường 4D",
+    # Giảng đường tầng 5
+    "Giảng đường 5A1", "Giảng đường 5A2", "Giảng đường 5B1", "Giảng đường 5B2", "Giảng đường 5C", "Giảng đường 5D",
+    # Giảng đường tầng 6
+    "Giảng đường 6A", "Giảng đường 6B", "Giảng đường 6C", "Giảng đường 6D",
+    # Giảng đường tầng 7
+    "Giảng đường 7B", "Giảng đường 7C", "Giảng đường 7D",
+    # Giảng đường tầng 9
+    "Giảng đường 9A1", "Giảng đường 9A2", "Giảng đường 9B", "Giảng đường 9C", "Giảng đường 9D",
     "Sân trường 217 khu cột cờ",
     "Sân trường khu nhà 15 tầng",
     "Sân thể thao đa năng",
@@ -372,8 +382,39 @@ div[data-baseweb="notification"] div,
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. HÀM TRỢ GIÚP
+# 2. HÀM TRỢ GIÚP (ĐÃ THÊM HÀM ÉP KIỂU AN TOÀN TO_SAFE_DATE & TO_SAFE_TIME)
 # ==============================================================================
+def to_safe_date(val, default_val=None):
+    if default_val is None:
+        default_val = date.today()
+    if pd.isna(val) or val is None or str(val).strip() == "" or str(val).strip().lower() in ["nan", "nat", "none"]:
+        return default_val
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    try:
+        dt = pd.to_datetime(str(val).strip(), errors="coerce")
+        if pd.notna(dt):
+            return dt.date()
+    except Exception:
+        pass
+    return default_val
+
+def to_safe_time(val, default_val=None):
+    if default_val is None:
+        default_val = time(7, 0)
+    if pd.isna(val) or val is None or str(val).strip() == "" or str(val).strip().lower() in ["nan", "none"]:
+        return default_val
+    if isinstance(val, time):
+        return val
+    if isinstance(val, datetime):
+        return val.time()
+    t_parsed = parse_time(val)
+    if t_parsed:
+        return time(t_parsed[0], t_parsed[1])
+    return default_val
+
 def parse_time(text):
     if pd.isna(text): return None
     text = str(text).strip().lower()
@@ -839,7 +880,6 @@ def build_support_table_with_status(df_input):
             raw_val = r.get(col_key, "")
             qty = 0
             
-            # Xử lý đặc biệt cho Chạy bảng điện tử: nhận diện qua cờ Có HOẶC có nội dung text
             if col_key == "support_bang_dien_tu":
                 content_led = clean_text(r.get("Nội dung chạy bảng điện tử (nếu có)", ""))
                 if is_yes(raw_val) or (content_led and content_led.upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]):
@@ -871,12 +911,10 @@ def build_support_table_with_status(df_input):
                 is_done = "HOÀN THÀNH" in status_val.upper()
                 
                 alert_tag = "✅ Bình thường"
-                # 1. Cảnh báo sau 24h duyệt chưa có người nhận
                 if not is_assigned and not is_done and pd.notna(app_time):
                     if (now - app_time).total_seconds() > 86400:
                         alert_tag = "⚠️ Chưa có người nhận (>24h duyệt)"
                         
-                # 2. Cảnh báo tiến độ hoàn thành (Riêng Chuẩn bị nước cho phép +- 10 phút tính từ giờ bắt đầu)
                 if not is_done and pd.notna(start_time):
                     if col_key == "support_chuan_bi_nuoc":
                         deadline = start_time + timedelta(minutes=10)
@@ -897,7 +935,6 @@ def build_support_table_with_status(df_input):
                 
                 worker_display = parse_worker_name_from_status(status_val)
                 
-                # Tự động gán hiển thị chuẩn theo phân công nếu chưa nhận
                 if worker_display == "Chưa nhận nhiệm vụ":
                     assigned_rule = get_auto_assigned_worker(col_key, loc_str)
                     if assigned_rule: worker_display = f"{assigned_rule} (Chưa nhận)"
@@ -1222,7 +1259,6 @@ if menu == "Dashboard":
                     raw_val = raw_row_data.get(col_k, "")
                     qty_k = 0
                     
-                    # Tự động bắt chạy bảng điện tử nếu có text HOẶC cờ Có
                     if col_k == "support_bang_dien_tu":
                         content_led = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
                         if is_yes(raw_val) or (content_led and content_led.upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]):
@@ -1250,7 +1286,6 @@ if menu == "Dashboard":
                         st_val_k = clean_text(raw_row_data.get(st_col_k, ""))
                         worker_assigned = parse_worker_name_from_status(st_val_k)
                         
-                        # Tự động gán nếu chưa nhận
                         if worker_assigned == "Chưa nhận nhiệm vụ":
                             assigned_rule = get_auto_assigned_worker(col_k, cur_location_ev)
                             if assigned_rule: worker_assigned = f"{assigned_rule}"
@@ -1368,7 +1403,7 @@ if menu == "Dashboard":
                 st.session_state.selected_event_details = None
                 st.rerun()
                 
-        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD =================
+        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD (ĐÃ SỬA LỖI ATTRIBUTE ERROR) =================
         with col_act2:
             with st.expander("✏️ Quản trị viên: Điều chỉnh sự kiện"):
                 if not st.session_state.get("admin_logged_in", False):
@@ -1383,6 +1418,8 @@ if menu == "Dashboard":
                     st.markdown(f"#### 📝 Form Điều chỉnh sự kiện ID {ev_id}")
                     ev_s_date = raw_row_data.get("start")
                     ev_e_date = raw_row_data.get("end")
+                    ev_s_time = raw_row_data.get("start_time", raw_row_data.get("Giờ bắt đầu"))
+                    ev_e_time = raw_row_data.get("end_time", raw_row_data.get("Giờ kết thúc"))
                     
                     e_name = st.text_input("Tên sự kiện:", value=clean_text(raw_row_data.get("event", "")), key=f"de_name_{ev_id}")
                     
@@ -1398,15 +1435,21 @@ if menu == "Dashboard":
                     edit_bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có):", value=sub_unit, key=f"de_bomon_{ev_id}")
                     final_edit_donvi = f"{edit_donvi_lon} - {edit_bomon_to.strip()}" if edit_bomon_to.strip() else edit_donvi_lon
                     
+                    # ĐÃ KHẮC PHỤC LỖI TẠI ĐÂY BẰNG HÀM TO_SAFE_DATE VÀ TO_SAFE_TIME
+                    val_s_date = to_safe_date(ev_s_date, today.date())
+                    val_e_date = to_safe_date(ev_e_date, val_s_date)
+                    val_s_time = to_safe_time(ev_s_time if ev_s_time else ev_s_date, time(7, 0))
+                    val_e_time = to_safe_time(ev_e_time if ev_e_time else ev_e_date, time(11, 0))
+
                     de_c1, de_c2 = st.columns(2)
                     with de_c1:
-                        e_sd = st.date_input("Ngày bắt đầu:", value=ev_s_date.date() if pd.notna(ev_s_date) else today.date(), key=f"de_sd_{ev_id}")
-                        e_st = st.time_input("Giờ bắt đầu:", value=ev_s_date.time() if pd.notna(ev_s_date) else time(7, 0), key=f"de_st_{ev_id}")
+                        e_sd = st.date_input("Ngày bắt đầu:", value=val_s_date, key=f"de_sd_{ev_id}")
+                        e_st = st.time_input("Giờ bắt đầu:", value=val_s_time, key=f"de_st_{ev_id}")
                     with de_c2:
-                        e_ed = st.date_input("Ngày kết thúc:", value=ev_e_date.date() if pd.notna(ev_e_date) else e_sd, key=f"de_ed_{ev_id}")
-                        e_et = st.time_input("Giờ kết thúc:", value=ev_e_date.time() if pd.notna(ev_e_date) else time(11, 0), key=f"de_et_{ev_id}")
+                        e_ed = st.date_input("Ngày kết thúc:", value=val_e_date, key=f"de_ed_{ev_id}")
+                        e_et = st.time_input("Giờ kết thúc:", value=val_e_time, key=f"de_et_{ev_id}")
                         
-                    # 2. Điều chỉnh Địa điểm với multiselect cho phép chọn nhiều nơi
+                    # 2. Điều chỉnh Địa điểm với multiselect cho phép chọn nhiều nơi (Đã có giảng đường mới)
                     cur_loc_raw = clean_text(raw_row_data.get("location", ""))
                     cur_locs_list = [loc.strip() for loc in cur_loc_raw.split(",") if loc.strip()]
                     pre_sel_locs = [loc for loc in cur_locs_list if loc in DANH_MUC_DIA_DIEM_CO_DINH]
@@ -1429,7 +1472,6 @@ if menu == "Dashboard":
                     is_ht_or_hd_edit = ("hoi thao" in loc_norm_edit or "hoi dong" in loc_norm_edit)
                     
                     st.markdown("---")
-                    # ================= KHUNG ĐIỀU CHỈNH THÀNH PHẦN ĐẠI BIỂU (ERP TINH GỌN) =================
                     st.markdown("##### 👥 Thành phần Đại biểu tham dự")
                     cur_tp_raw = clean_text(raw_row_data.get("thanh_phan", ""))
                     
@@ -1492,13 +1534,11 @@ if menu == "Dashboard":
                             edit_support_vals["support_bang_ten"] = st.number_input("Bảng tên mica", min_value=0, value=count_value(raw_row_data.get("support_bang_ten", 0)), step=1, key=f"ed_bangten_{ev_id}")
                             edit_support_vals["support_bia_ky_ket"] = st.number_input("Bìa ký kết", min_value=0, value=count_value(raw_row_data.get("support_bia_ky_ket", 0)), step=1, key=f"ed_bia_{ev_id}")
                             
-                            # Ẩn Số lượng nước uống nếu là BGH hoặc Hội thảo / Hội đồng
                             if not (is_bgh_edit or is_ht_or_hd_edit):
                                 edit_support_vals["support_nuoc_uong"] = st.number_input("Số lượng nước uống", min_value=0, value=count_value(raw_row_data.get("support_nuoc_uong", 0)), step=1, key=f"ed_nuoc_{ev_id}")
                             else:
                                 edit_support_vals["support_nuoc_uong"] = 0
                             
-                            # Chuẩn bị nước (Chỉ chọn CÓ / KHÔNG)
                             edit_support_vals["support_chuan_bi_nuoc"] = st.selectbox("Chuẩn bị nước", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_chuan_bi_nuoc", "")) else 0, key=f"ed_cbnuoc_{ev_id}")
                             edit_support_vals["support_bao_ve"] = st.selectbox("Bảo vệ", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_bao_ve", "")) else 0, key=f"ed_bv_{ev_id}")
                             edit_support_vals["support_dang_tin"] = st.selectbox("Đăng tin truyền thông", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_dang_tin", "")) else 0, key=f"ed_dangtin_{ev_id}")
@@ -1519,14 +1559,12 @@ if menu == "Dashboard":
                             edit_support_vals["support_bandroll_standee"] = st.text_input("Bandroll, standee", value=clean_text(raw_row_data.get("support_bandroll_standee", "")), key=f"ed_bs_{ev_id}")
                             edit_support_vals["support_backdrop"] = st.text_input("Backdrop", value=clean_text(raw_row_data.get("support_backdrop", "")), key=f"ed_bd_{ev_id}")
                             
-                            # Xác định trạng thái ban đầu của Chạy bảng điện tử
                             cur_bdt_raw = raw_row_data.get("support_bang_dien_tu", "")
                             cur_bdt_content = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
                             bdt_pre_idx = 1 if (is_yes(cur_bdt_raw) or (cur_bdt_content and cur_bdt_content.upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"])) else 0
                             
                             edit_support_vals["support_bang_dien_tu"] = st.selectbox("Chạy bảng điện tử (SL: 2)", ["KHÔNG", "CÓ"], index=bdt_pre_idx, key=f"ed_bdt_{ev_id}")
                             
-                            # Chỉ hiện ô nhập nội dung nếu chọn CÓ
                             if is_yes(edit_support_vals["support_bang_dien_tu"]):
                                 edit_support_vals["noi_dung_bang_dien_tu"] = st.text_area("Nội dung chạy bảng LED:", value=cur_bdt_content, key=f"ed_nbdt_{ev_id}")
                             else:
@@ -1668,7 +1706,7 @@ if menu == "Dashboard":
     c2.metric("Tháng", sum(1 for d in event_dates_for_stats if d.month == today.month and d.year == today.year))
     c3.metric("Năm", sum(1 for d in event_dates_for_stats if d.year == today.year))
 
-# --- ĐĂNG KÝ ---
+# --- ĐĂNG KÝ (ĐÃ TỰ ĐỘNG SINH CÁC BUỔI LIÊN TỤC TỪ NGÀY BẮT ĐẦU ĐẾN NGÀY KẾT THÚC) ---
 elif menu == "Đăng ký":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📝 Đăng ký sự kiện</div>', unsafe_allow_html=True)
@@ -1676,18 +1714,15 @@ elif menu == "Đăng ký":
 
     dc1, dc2 = st.columns(2)
     with dc1:
-        start_date = st.date_input("Ngày tổ chức", key="reg_start_date")
-        session_opt = st.selectbox("Khung giờ tổ chức mặc định", ["Sáng (07:00 - 11:00)", "Chiều (13:00 - 17:00)", "Tùy chọn giờ"])
-        if session_opt == "Sáng (07:00 - 11:00)": default_start, default_end = time(7, 0), time(11, 0)
-        elif session_opt == "Chiều (13:00 - 17:00)": default_start, default_end = time(13, 0), time(17, 0)
-        else: default_start, default_end = time(7, 0), time(11, 0)
-        start_time = st.time_input("Giờ bắt đầu", value=default_start)
+        start_date = st.date_input("Ngày bắt đầu tổ chức", key="reg_start_date")
+        start_buoi = st.selectbox("Buổi bắt đầu (ngày đầu tiên):", ["Sáng (07:00 - 11:00)", "Chiều (13:00 - 17:00)"])
     with dc2:
         if st.session_state.reg_start_date != st.session_state.reg_prev_start_date:
             st.session_state.reg_end_date = st.session_state.reg_start_date
             st.session_state.reg_prev_start_date = st.session_state.reg_start_date
         end_date = st.date_input("Ngày kết thúc", key="reg_end_date")
-        end_time = st.time_input("Giờ kết thúc", value=default_end)
+        end_buoi = st.selectbox("Buổi kết thúc (ngày cuối cùng):", ["Chiều (13:00 - 17:00)", "Sáng (07:00 - 11:00)"])
+        
     support_flag = st.selectbox("Có yêu cầu hỗ trợ?", ["KHÔNG", "CÓ"], key="reg_support_flag")
 
     # ================= KHUNG CHỌN ĐẠI BIỂU THAM DỰ (ERP TINH GỌN) =================
@@ -1740,6 +1775,7 @@ elif menu == "Đăng ký":
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
+            # ĐÃ CÓ ĐẦY ĐỦ CÁC GIẢNG ĐƯỜNG MỚI ĐƯỢC BỔ SUNG VÀO DANH MỤC
             dia_diem_select_list = st.multiselect("Địa điểm tổ chức (chọn một hoặc nhiều)", DANH_MUC_DIA_DIEM_CO_DINH, default=["Phòng họp BGH"])
             dia_diem_khac = ""
             if "Khác" in dia_diem_select_list:
@@ -1770,13 +1806,11 @@ elif menu == "Đăng ký":
                 support_bang_ten = st.number_input("Số lượng bảng tên (mica)", min_value=0, step=1)
                 support_bia_ky_ket = st.number_input("Số lượng bìa ký kết", min_value=0, step=1)
                 
-                # Ẩn hoàn toàn Số lượng nước uống nếu là BGH hoặc Hội thảo / Hội đồng
                 if not (is_bgh_room_reg or is_hoi_thao_or_dong_reg):
                     support_nuoc_uong = st.number_input("Số lượng nước uống", min_value=0, step=1)
                 else:
                     support_nuoc_uong = 0
                     
-                # Chuẩn bị nước: Chỉ chọn CÓ / KHÔNG
                 support_chuan_bi_nuoc = st.selectbox("Chuẩn bị nước", ["KHÔNG", "CÓ"])
                 support_bao_ve = st.selectbox("Bảo vệ", ["KHÔNG", "CÓ"])
                 support_dang_tin = st.selectbox("Đăng tin truyền thông", ["KHÔNG", "CÓ"])
@@ -1798,7 +1832,6 @@ elif menu == "Đăng ký":
                 support_backdrop = st.text_input("Backdrop print/install")
                 support_bang_dien_tu = st.selectbox("Chạy bảng điện tử (SL: 2)", ["KHÔNG", "CÓ"])
                 
-                # Chỉ hiện ô nhập nội dung nếu chọn CÓ chạy bảng điện tử
                 if is_yes(support_bang_dien_tu):
                     noi_dung_bang_dien_tu = st.text_area("Nội dung chạy bảng điện tử (nếu có)")
                 else:
@@ -1815,8 +1848,10 @@ elif menu == "Đăng ký":
     if submitted:
         if not event_name or not donvi_lon or not final_loc_preview or final_loc_preview == "Chưa xác định": 
             st.error("Vui lòng nhập tối thiểu: Tên sự kiện, Đơn vị và Địa điểm.")
+        elif start_date > end_date:
+            st.error("Ngày bắt đầu không được lớn hơn ngày kết thúc!")
         else:
-            with st.spinner("Đang lưu sự kiện..."):
+            with st.spinner("Đang lưu sự kiện và tự động sinh lịch các buổi..."):
                 donvi_display = f"{donvi_lon} - {bomon_to.strip()}" if bomon_to.strip() else donvi_lon
                 
                 thanh_phan_list = []
@@ -1832,49 +1867,104 @@ elif menu == "Đăng ký":
                 if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
                 final_thanh_phan = "\n".join(thanh_phan_list)
 
+                # TỰ ĐỘNG TẠO DANH SÁCH CÁC BUỔI THEO KHUNG NGÀY (CẢ NGÀY HOẶC NỬA NGÀY LIỀN KỀ)
+                is_start_sang = "Sáng" in start_buoi
+                is_end_chieu = "Chiều" in end_buoi
+
+                auto_sessions = []
+                curr_loop_d = start_date
+                while curr_loop_d <= end_date:
+                    if curr_loop_d == start_date and curr_loop_d == end_date:
+                        # Cùng 1 ngày
+                        if is_start_sang and is_end_chieu:
+                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
+                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                        elif is_start_sang and not is_end_chieu:
+                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
+                        elif not is_start_sang and is_end_chieu:
+                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                        else:
+                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                    elif curr_loop_d == start_date:
+                        if is_start_sang:
+                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
+                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                        else:
+                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                    elif curr_loop_d == end_date:
+                        if is_end_chieu:
+                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
+                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                        else:
+                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
+                    else:
+                        # Các ngày ở giữa luôn là cả ngày
+                        auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
+                        auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
+                        
+                    curr_loop_d += timedelta(days=1)
+
                 df_excel = read_onedrive_excel()
                 if df_excel.empty: st.error("Không thể kết nối đọc file OneDrive!")
                 else:
                     valid_ids = pd.to_numeric(df_excel["Id"], errors="coerce").dropna()
                     next_id = int(valid_ids.max() + 1) if not valid_ids.empty else 1
-                    new_row = {col: None for col in df_excel.columns}
-                    new_row["Id"], new_row["Thời gian bắt đầu"], new_row["Email"], new_row["Tên"], new_row["Đơn vị phụ trách/ tổ chức"], new_row["Tên sự kiện"], new_row["Ngày tổ chức"], new_row["Giờ bắt đầu"], new_row["Giờ kết thúc"], new_row["Ngày kết thúc"], new_row["Địa điểm tổ chức"], new_row["Thông tin người phụ trách"], new_row["Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = next_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), email, nguoi_dang_ky, donvi_display, event_name, start_date.strftime("%Y-%m-%d"), start_time.strftime("%H:%M"), end_time.strftime("%H:%M"), end_date.strftime("%Y-%m-%d"), final_loc_preview, nguoi_phu_trach, support_flag
                     
-                    new_row["Số lượng bàn đón tiếp"] = support_ban_don_tiep
-                    new_row["Cần trải khăn bàn hội trường"] = support_khan_ban
-                    new_row["Số lượng lễ tân"] = support_le_tan
-                    new_row["Số lượng bảng tên (bảng mica)"] = support_bang_ten
-                    new_row["Số lượng bìa ký kết"] = support_bia_ky_ket
-                    new_row["Số lượng nước uống"] = support_nuoc_uong
-                    new_row["Số phần Teabreak"] = support_teabreak
-                    new_row["Số lượng hoa để bàn"] = support_hoa_ban
-                    new_row["Số lượng hoa để bục phát biểu"] = support_hoa_buc
-                    new_row["Số lượng hoa bó để tặng"] = support_hoa_tang
-                    new_row["Số lượng quà tặng"] = support_qua_tang
-                    new_row["Số lượng Brochure"] = support_brochure
-                    new_row["Số lượng khay bưng"] = support_khay_bung
-                    new_row["Số lượng bandroll, standee cần in và thi công"] = support_bandroll_standee
-                    new_row["Số lượng Backdrop cần in và thi công"] = support_backdrop
-                    new_row["Cần chạy bảng điện tử"] = support_bang_dien_tu
-                    new_row["Nội dung chạy bảng điện tử (nếu có)"] = noi_dung_bang_dien_tu
-                    new_row["Cần gửi thư mời"] = support_thu_moi
-                    new_row["Đăng tin truyền thông"] = support_dang_tin
-                    new_row["Máy tính và thiết bị trình chiếu"] = support_may_tinh_chieu
-                    new_row["Livestreams, Truyền hình"] = support_livestream
-                    new_row["Chuẩn bị nước"] = support_chuan_bi_nuoc
-                    new_row["Bảo vệ"] = support_bao_ve
-                    new_row["MC"] = support_mc
-                    new_row["Kịch bản chương trình"] = support_kich_ban
-                    new_row["Cảnh quan - VS"] = support_canh_quan
-                    new_row["Xe đưa đón đại biểu"] = support_xe_dua_don
-                    new_row["Y tế"] = support_y_te
-                    new_row["Văn thư (CV, đóng dấu,...)"] = support_van_thu
-                    new_row["Các yêu cầu khác (nếu có)"] = support_khac
-                    new_row["Thành phần tham dự"] = final_thanh_phan
+                    new_rows_list = []
+                    for s_d, s_t, e_t in auto_sessions:
+                        new_row = {col: None for col in df_excel.columns}
+                        new_row["Id"] = next_id
+                        new_row["Thời gian bắt đầu"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        new_row["Email"] = email
+                        new_row["Tên"] = nguoi_dang_ky
+                        new_row["Đơn vị phụ trách/ tổ chức"] = donvi_display
+                        new_row["Tên sự kiện"] = event_name
+                        new_row["Ngày tổ chức"] = s_d.strftime("%Y-%m-%d")
+                        new_row["Giờ bắt đầu"] = s_t.strftime("%H:%M")
+                        new_row["Giờ kết thúc"] = e_t.strftime("%H:%M")
+                        new_row["Ngày kết thúc"] = s_d.strftime("%Y-%m-%d")
+                        new_row["Địa điểm tổ chức"] = final_loc_preview
+                        new_row["Thông tin người phụ trách"] = nguoi_phu_trach
+                        new_row["Một số ĐỀ XUẤT HỖ TRỢ từ phòng Hành chính Tổng hợp"] = support_flag
+                        
+                        new_row["Số lượng bàn đón tiếp"] = support_ban_don_tiep
+                        new_row["Cần trải khăn bàn hội trường"] = support_khan_ban
+                        new_row["Số lượng lễ tân"] = support_le_tan
+                        new_row["Số lượng bảng tên (bảng mica)"] = support_bang_ten
+                        new_row["Số lượng bìa ký kết"] = support_bia_ky_ket
+                        new_row["Số lượng nước uống"] = support_nuoc_uong
+                        new_row["Số phần Teabreak"] = support_teabreak
+                        new_row["Số lượng hoa để bàn"] = support_hoa_ban
+                        new_row["Số lượng hoa để bục phát biểu"] = support_hoa_buc
+                        new_row["Số lượng hoa bó để tặng"] = support_hoa_tang
+                        new_row["Số lượng quà tặng"] = support_qua_tang
+                        new_row["Số lượng Brochure"] = support_brochure
+                        new_row["Số lượng khay bưng"] = support_khay_bung
+                        new_row["Số lượng bandroll, standee cần in và thi công"] = support_bandroll_standee
+                        new_row["Số lượng Backdrop cần in và thi công"] = support_backdrop
+                        new_row["Cần chạy bảng điện tử"] = support_bang_dien_tu
+                        new_row["Nội dung chạy bảng điện tử (nếu có)"] = noi_dung_bang_dien_tu
+                        new_row["Cần gửi thư mời"] = support_thu_moi
+                        new_row["Đăng tin truyền thông"] = support_dang_tin
+                        new_row["Máy tính và thiết bị trình chiếu"] = support_may_tinh_chieu
+                        new_row["Livestreams, Truyền hình"] = support_livestream
+                        new_row["Chuẩn bị nước"] = support_chuan_bi_nuoc
+                        new_row["Bảo vệ"] = support_bao_ve
+                        new_row["MC"] = support_mc
+                        new_row["Kịch bản chương trình"] = support_kich_ban
+                        new_row["Cảnh quan - VS"] = support_canh_quan
+                        new_row["Xe đưa đón đại biểu"] = support_xe_dua_don
+                        new_row["Y tế"] = support_y_te
+                        new_row["Văn thư (CV, đóng dấu,...)"] = support_van_thu
+                        new_row["Các yêu cầu khác (nếu có)"] = support_khac
+                        new_row["Thành phần tham dự"] = final_thanh_phan
+                        
+                        new_rows_list.append(new_row)
+                        next_id += 1
                     
-                    if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame([new_row])], ignore_index=True)):
-                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), final_loc_preview)
-                        st.session_state["approval_msg"] = f"🎉 Đăng ký thành công ID {next_id}! Đợi duyệt. Kết quả sẽ hiện trên Dashboard Lịch sau khi duyệt."
+                    if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame(new_rows_list)], ignore_index=True)):
+                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, time(7, 0)), final_loc_preview)
+                        st.session_state["approval_msg"] = f"🎉 Đăng ký thành công {len(new_rows_list)} buổi sự kiện liên tục! Hệ thống đã tự động lên lịch đầy đủ."
                         st.rerun()
 
 # --- BÁO CÁO & CẢNH BÁO & HỖ TRỢ & TRUY VẤN AI ---
@@ -2039,10 +2129,16 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                         ec1, ec2 = st.columns(2)
                         with ec1:
                             st.markdown("**🕒 Thời gian tổ chức:**")
-                            new_start_date = st.date_input("Ngày tổ chức", value=row_edit["start"].date() if pd.notna(row_edit["start"]) else today.date(), key="edit_sd")
-                            new_start_time = st.time_input("Giờ bắt đầu", value=row_edit["start"].time() if pd.notna(row_edit["start"]) else time(7, 0), key="edit_st")
-                            new_end_date = st.date_input("Ngày kết thúc", value=row_edit["end"].date() if pd.notna(row_edit["end"]) else new_start_date, key="edit_ed")
-                            new_end_time = st.time_input("Giờ kết thúc", value=row_edit["end"].time() if pd.notna(row_edit["end"]) else time(11, 0), key="edit_et")
+                            # SỬ DỤNG TO_SAFE_DATE & TO_SAFE_TIME
+                            edit_s_d_val = to_safe_date(row_edit.get("start"), today.date())
+                            edit_e_d_val = to_safe_date(row_edit.get("end"), edit_s_d_val)
+                            edit_s_t_val = to_safe_time(row_edit.get("start_time", row_edit.get("start")), time(7, 0))
+                            edit_e_t_val = to_safe_time(row_edit.get("end_time", row_edit.get("end")), time(11, 0))
+
+                            new_start_date = st.date_input("Ngày tổ chức", value=edit_s_d_val, key="edit_sd")
+                            new_start_time = st.time_input("Giờ bắt đầu", value=edit_s_t_val, key="edit_st")
+                            new_end_date = st.date_input("Ngày kết thúc", value=edit_e_d_val, key="edit_ed")
+                            new_end_time = st.time_input("Giờ kết thúc", value=edit_e_t_val, key="edit_et")
                             
                         with ec2:
                             st.markdown("**📍 Địa điểm & 👥 Thành phần:**")
