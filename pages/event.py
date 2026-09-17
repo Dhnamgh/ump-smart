@@ -1122,24 +1122,23 @@ if menu == "Dashboard":
         cur_date = s.date()
         end_date = e.date()
         
-        # Kiểm tra xem sự kiện có bao trùm cả ngày (kéo dài qua buổi chiều) hay không
-        is_full_day_span = (cur_date < end_date) or (s.hour <= 8 and e.hour >= 13) or (not has_time)
+        # Nếu sự kiện trải qua từ 2 ngày trở lên -> Luôn coi là sự kiện nhiều ngày
+        is_multi_day = (cur_date < end_date)
+        is_full_day_single = (cur_date == end_date) and ((s.hour <= 8 and e.hour >= 13) or (not has_time))
         
         while cur_date <= end_date:
             daily_sessions = []
             
-            if is_full_day_span:
-                # Nếu là ngày đầu tiên mà bắt đầu sau 12:00 -> Chỉ có buổi chiều
-                if cur_date == s.date() and s.hour >= 12:
-                    daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
-                # Nếu là ngày cuối cùng mà kết thúc trước 12:00 -> Chỉ có buổi sáng
-                elif cur_date == end_date and e.hour < 12 and e.hour > 0:
-                    daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
-                else:
-                    # Các trường hợp cả ngày: tự động sinh cả Sáng và Chiều
-                    daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
-                    daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
+            if is_multi_day:
+                # Sự kiện nhiều ngày liên tục: Tự động điền ĐẦY ĐỦ cả Sáng và Chiều cho tất cả các ngày
+                daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
+                daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
+            elif is_full_day_single:
+                # Sự kiện trong 1 ngày nhưng bao trùm cả sáng lẫn chiều
+                daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
+                daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
             else:
+                # Sự kiện chỉ diễn ra đúng 1 buổi cụ thể
                 daily_sessions.append((s.time(), e.time(), s.strftime("%H:%M") if has_time else "Cả ngày"))
                 
             for sess_s, sess_e, sess_lbl in daily_sessions:
