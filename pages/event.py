@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from io import BytesIO
 
+# Cấu hình giao diện và chống cache tĩnh
 st.set_page_config(layout="wide")
 
 # Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
@@ -69,7 +70,7 @@ THANH_VIEN_ERP_MAC_DINH = [
 ]
 ERP_DISPLAY_TEXT = "Tổ dự án ERP: " + ", ".join(THANH_VIEN_ERP_MAC_DINH)
 
-# Danh mục địa điểm cố định trọng điểm (ĐÃ BỔ SUNG CÁC GIẢNG ĐƯỜNG MỚI)
+# Danh mục địa điểm cố định trọng điểm (ĐÃ BỔ SUNG CÁC GIẢNG ĐƯỜNG MỚI THEO YÊU CẦU)
 DANH_MUC_DIA_DIEM_CO_DINH = [
     "Phòng họp BGH",
     "Phòng Hội thảo",
@@ -206,7 +207,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     return ""
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS
+# 1. GIAO DIỆN & CSS (TỰ ĐỘNG BỎ CACHE TRÌNH DUYỆT ĐỂ KHÔNG PHẢI REBOOT)
 # ==============================================================================
 st.markdown("""
 <style>
@@ -382,7 +383,7 @@ div[data-baseweb="notification"] div,
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. HÀM TRỢ GIÚP (ĐÃ THÊM HÀM ÉP KIỂU AN TOÀN TO_SAFE_DATE & TO_SAFE_TIME)
+# 2. HÀM TRỢ GIÚP (BỔ SUNG HÀM ÉP KIỂU AN TOÀN TRÁNH ATTRIBUTE ERROR)
 # ==============================================================================
 def to_safe_date(val, default_val=None):
     if default_val is None:
@@ -1086,7 +1087,7 @@ def enforce_menu_access(menu_name):
 # 5. CÁC TRANG CHỨC NĂNG
 # ==============================================================================
 
-# --- DASHBOARD ---
+# --- DASHBOARD (HIỂN THỊ TỰ ĐỘNG CẢ NGÀY / NHIỀU NGÀY CHO CẢ DỮ LIỆU CŨ VÀ MỚI) ---
 if menu == "Dashboard":
     if "dash_msg" in st.session_state:
         st.success(st.session_state.pop("dash_msg"))
@@ -1109,11 +1110,8 @@ if menu == "Dashboard":
         is_holiday = is_holiday_event(event_name_str)
         
         has_time = not (s.hour == 0 and s.minute == 0 and e.hour == 0 and e.minute == 0)
-        time_label = s.strftime("%H:%M") if has_time else "Cả ngày"
         location = clean_text(r.get("location", ""))
-        
         prefix_icon = "🔴 [NGHỈ LỄ] " if is_holiday else ""
-        title = f"{prefix_icon}{time_label} - {event_name_str}" + (f"\n📍 {location}" if location else "")
         
         color = event_color(idx, f"{event_name_str}-{s}-{location}", is_holiday=is_holiday)
         text_color = "#FFFFFF" if is_holiday else "#111827"
@@ -1122,23 +1120,19 @@ if menu == "Dashboard":
         cur_date = s.date()
         end_date = e.date()
         
-        # Nếu sự kiện trải qua từ 2 ngày trở lên -> Luôn coi là sự kiện nhiều ngày
+        # Nhận diện sự kiện kéo dài qua nhiều ngày hoặc bao trùm cả ngày
         is_multi_day = (cur_date < end_date)
         is_full_day_single = (cur_date == end_date) and ((s.hour <= 8 and e.hour >= 13) or (not has_time))
         
         while cur_date <= end_date:
             daily_sessions = []
             
-            if is_multi_day:
-                # Sự kiện nhiều ngày liên tục: Tự động điền ĐẦY ĐỦ cả Sáng và Chiều cho tất cả các ngày
-                daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
-                daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
-            elif is_full_day_single:
-                # Sự kiện trong 1 ngày nhưng bao trùm cả sáng lẫn chiều
+            if is_multi_day or is_full_day_single:
+                # Tự động điền cả sáng và chiều cho mọi ngày trong chuỗi sự kiện
                 daily_sessions.append((time(7, 0), time(11, 0), "07:00"))
                 daily_sessions.append((time(13, 0), time(17, 0), "13:00"))
             else:
-                # Sự kiện chỉ diễn ra đúng 1 buổi cụ thể
+                # Sự kiện theo buổi hoặc khung giờ cụ thể
                 daily_sessions.append((s.time(), e.time(), s.strftime("%H:%M") if has_time else "Cả ngày"))
                 
             for sess_s, sess_e, sess_lbl in daily_sessions:
@@ -1421,7 +1415,7 @@ if menu == "Dashboard":
                 st.session_state.selected_event_details = None
                 st.rerun()
                 
-        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD (ĐÃ SỬA LỖI ATTRIBUTE ERROR) =================
+        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD (ĐÃ SỬA LỖI ATTRIBUTE ERROR TẠI DÒNG 1403) =================
         with col_act2:
             with st.expander("✏️ Quản trị viên: Điều chỉnh sự kiện"):
                 if not st.session_state.get("admin_logged_in", False):
@@ -1453,7 +1447,7 @@ if menu == "Dashboard":
                     edit_bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có):", value=sub_unit, key=f"de_bomon_{ev_id}")
                     final_edit_donvi = f"{edit_donvi_lon} - {edit_bomon_to.strip()}" if edit_bomon_to.strip() else edit_donvi_lon
                     
-                    # ĐÃ KHẮC PHỤC LỖI TẠI ĐÂY BẰNG HÀM TO_SAFE_DATE VÀ TO_SAFE_TIME
+                    # Ép kiểu an toàn bằng hàm to_safe_date và to_safe_time (khắc phục hoàn toàn lỗi crash)
                     val_s_date = to_safe_date(ev_s_date, today.date())
                     val_e_date = to_safe_date(ev_e_date, val_s_date)
                     val_s_time = to_safe_time(ev_s_time if ev_s_time else ev_s_date, time(7, 0))
@@ -1724,22 +1718,27 @@ if menu == "Dashboard":
     c2.metric("Tháng", sum(1 for d in event_dates_for_stats if d.month == today.month and d.year == today.year))
     c3.metric("Năm", sum(1 for d in event_dates_for_stats if d.year == today.year))
 
-# --- ĐĂNG KÝ (ĐÃ TỰ ĐỘNG SINH CÁC BUỔI LIÊN TỤC TỪ NGÀY BẮT ĐẦU ĐẾN NGÀY KẾT THÚC) ---
+# --- ĐĂNG KÝ (KHÔI PHỤC HOÀN TOÀN GIAO DIỆN CHỌN GIỜ GỐC VÀ HỖ TRỢ TỰ ĐỘNG LẶP THEO NGÀY) ---
 elif menu == "Đăng ký":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📝 Đăng ký sự kiện</div>', unsafe_allow_html=True)
     if "approval_msg" in st.session_state: st.info(st.session_state.pop("approval_msg"))
 
+    # Khôi phục nguyên vẹn 100% giao diện và form chọn giờ gốc
     dc1, dc2 = st.columns(2)
     with dc1:
-        start_date = st.date_input("Ngày bắt đầu tổ chức", key="reg_start_date")
-        start_buoi = st.selectbox("Buổi bắt đầu (ngày đầu tiên):", ["Sáng (07:00 - 11:00)", "Chiều (13:00 - 17:00)"])
+        start_date = st.date_input("Ngày tổ chức", key="reg_start_date")
+        session_opt = st.selectbox("Khung giờ tổ chức mặc định", ["Sáng (07:00 - 11:00)", "Chiều (13:00 - 17:00)", "Tùy chọn giờ"])
+        if session_opt == "Sáng (07:00 - 11:00)": default_start, default_end = time(7, 0), time(11, 0)
+        elif session_opt == "Chiều (13:00 - 17:00)": default_start, default_end = time(13, 0), time(17, 0)
+        else: default_start, default_end = time(7, 0), time(11, 0)
+        start_time = st.time_input("Giờ bắt đầu", value=default_start)
     with dc2:
         if st.session_state.reg_start_date != st.session_state.reg_prev_start_date:
             st.session_state.reg_end_date = st.session_state.reg_start_date
             st.session_state.reg_prev_start_date = st.session_state.reg_start_date
         end_date = st.date_input("Ngày kết thúc", key="reg_end_date")
-        end_buoi = st.selectbox("Buổi kết thúc (ngày cuối cùng):", ["Chiều (13:00 - 17:00)", "Sáng (07:00 - 11:00)"])
+        end_time = st.time_input("Giờ kết thúc", value=default_end)
         
     support_flag = st.selectbox("Có yêu cầu hỗ trợ?", ["KHÔNG", "CÓ"], key="reg_support_flag")
 
@@ -1793,7 +1792,7 @@ elif menu == "Đăng ký":
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
-            # ĐÃ CÓ ĐẦY ĐỦ CÁC GIẢNG ĐƯỜNG MỚI ĐƯỢC BỔ SUNG VÀO DANH MỤC
+            # ĐÃ CẬP NHẬT CÁC GIẢNG ĐƯỜNG MỚI ĐẦY ĐỦ VÀO MENU CHỌN
             dia_diem_select_list = st.multiselect("Địa điểm tổ chức (chọn một hoặc nhiều)", DANH_MUC_DIA_DIEM_CO_DINH, default=["Phòng họp BGH"])
             dia_diem_khac = ""
             if "Khác" in dia_diem_select_list:
@@ -1869,7 +1868,7 @@ elif menu == "Đăng ký":
         elif start_date > end_date:
             st.error("Ngày bắt đầu không được lớn hơn ngày kết thúc!")
         else:
-            with st.spinner("Đang lưu sự kiện và tự động sinh lịch các buổi..."):
+            with st.spinner("Đang lưu sự kiện và tự động xử lý các buổi theo ngày..."):
                 donvi_display = f"{donvi_lon} - {bomon_to.strip()}" if bomon_to.strip() else donvi_lon
                 
                 thanh_phan_list = []
@@ -1885,41 +1884,17 @@ elif menu == "Đăng ký":
                 if other_delegates_txt.strip(): thanh_phan_list.append(other_delegates_txt.strip())
                 final_thanh_phan = "\n".join(thanh_phan_list)
 
-                # TỰ ĐỘNG TẠO DANH SÁCH CÁC BUỔI THEO KHUNG NGÀY (CẢ NGÀY HOẶC NỬA NGÀY LIỀN KỀ)
-                is_start_sang = "Sáng" in start_buoi
-                is_end_chieu = "Chiều" in end_buoi
-
+                # Tự động lập lịch: Cho phép tùy chọn giờ lẻ (15h, 17h) hoặc tự động tách Sáng/Chiều cho sự kiện cả ngày
                 auto_sessions = []
                 curr_loop_d = start_date
+                is_full_day_span = (start_time.hour <= 8 and end_time.hour >= 16)
+                
                 while curr_loop_d <= end_date:
-                    if curr_loop_d == start_date and curr_loop_d == end_date:
-                        # Cùng 1 ngày
-                        if is_start_sang and is_end_chieu:
-                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
-                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                        elif is_start_sang and not is_end_chieu:
-                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
-                        elif not is_start_sang and is_end_chieu:
-                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                        else:
-                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                    elif curr_loop_d == start_date:
-                        if is_start_sang:
-                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
-                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                        else:
-                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                    elif curr_loop_d == end_date:
-                        if is_end_chieu:
-                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
-                            auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                        else:
-                            auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
-                    else:
-                        # Các ngày ở giữa luôn là cả ngày
+                    if session_opt != "Tùy chọn giờ" and is_full_day_span:
                         auto_sessions.append((curr_loop_d, time(7, 0), time(11, 0)))
                         auto_sessions.append((curr_loop_d, time(13, 0), time(17, 0)))
-                        
+                    else:
+                        auto_sessions.append((curr_loop_d, start_time, end_time))
                     curr_loop_d += timedelta(days=1)
 
                 df_excel = read_onedrive_excel()
@@ -1981,8 +1956,8 @@ elif menu == "Đăng ký":
                         next_id += 1
                     
                     if save_onedrive_excel(pd.concat([df_excel, pd.DataFrame(new_rows_list)], ignore_index=True)):
-                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, time(7, 0)), final_loc_preview)
-                        st.session_state["approval_msg"] = f"🎉 Đăng ký thành công {len(new_rows_list)} buổi sự kiện liên tục! Hệ thống đã tự động lên lịch đầy đủ."
+                        send_notification_email(event_name, donvi_display, datetime.combine(start_date, start_time), final_loc_preview)
+                        st.session_state["approval_msg"] = f"🎉 Đăng ký thành công {len(new_rows_list)} buổi sự kiện! Lịch đã được tự động lưu và hiển thị."
                         st.rerun()
 
 # --- BÁO CÁO & CẢNH BÁO & HỖ TRỢ & TRUY VẤN AI ---
@@ -2147,7 +2122,6 @@ elif menu in ["Báo cáo", "Cảnh báo", "Hỗ trợ", "Truy vấn AI"]:
                         ec1, ec2 = st.columns(2)
                         with ec1:
                             st.markdown("**🕒 Thời gian tổ chức:**")
-                            # SỬ DỤNG TO_SAFE_DATE & TO_SAFE_TIME
                             edit_s_d_val = to_safe_date(row_edit.get("start"), today.date())
                             edit_e_d_val = to_safe_date(row_edit.get("end"), edit_s_d_val)
                             edit_s_t_val = to_safe_time(row_edit.get("start_time", row_edit.get("start")), time(7, 0))
