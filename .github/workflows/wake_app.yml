@@ -31,4 +31,4 @@ jobs:
           # App Regression
           curl -s -L "https://regression-myapp.streamlit.app/" \
             -H "User-Agent: Mozilla/5.0" -o /dev/null -w "App 3: %{http_code}\n" 
-            https://regression-myapp.streamlit.app/
+            
