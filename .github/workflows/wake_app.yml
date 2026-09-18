@@ -2,16 +2,24 @@ name: Wake Up Attendance App
 
 on:
   schedule:
-    # 22:45 UTC tương đương 05:45 sáng giờ Việt Nam (UTC+7), chạy từ Thứ 2 đến Thứ 7
     - cron: '45 22 * * 0-5'
-  workflow_dispatch: # Cho phép bấm chạy thử thủ công bất cứ lúc nào
+  workflow_dispatch:
 
 jobs:
   wake:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit App
+      - name: Ping All Streamlit Apps
         run: |
+          # App Event
           curl -s -L "https://ump-smartattend.streamlit.app/" \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-            -o /dev/null -w "HTTP Status: %{http_code}\n"
+            -H "User-Agent: Mozilla/5.0" -o /dev/null -w "App Điểm danh: %{http_code}\n"
+          
+          # App Điểm danh
+          curl -s -L "https://ump-attendance.streamlit.app/" \
+            -H "User-Agent: Mozilla/5.0" -o /dev/null -w "App 2: %{http_code}\n"
+
+          # App Đổi font chữ
+          curl -s -L "https://font-converter.streamlit.app/" \
+            -H "User-Agent: Mozilla/5.0" -o /dev/null -w "App 3: %{http_code}\n"
+            
