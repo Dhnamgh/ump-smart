@@ -19,46 +19,41 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Playwright
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install playwright
-          playwright install --with-deps chromium
+          pip install requests urllib3
 
-      - name: Run Wake-Up Script
+      - name: Ping and Wake Apps
         run: |
           python - << 'EOF'
-          import time
-          from playwright.sync_api import sync_playwright
+          import requests
 
-          urls = [
-              "https://ump-smartattend.streamlit.app/",
-              "https://ump-attendance.streamlit.app/",
-              "https://font-converter.streamlit.app/",
-              "https://regression-myapp.streamlit.app/"
+          apps = [
+              "ump-smartattend",
+              "ump-attendance",
+              "font-converter",
+              "regression-myapp"
           ]
 
-          with sync_playwright() as p:
-              browser = p.chromium.launch(headless=True)
-              for url in urls:
-                  print(f"--- Đang truy cập: {url} ---")
-                  page = browser.new_page()
-                  try:
-                      page.goto(url, timeout=60000)
-                      time.sleep(5)
-                      
-                      # Tự tìm và bấm nút nếu phát hiện app đang ngủ
-                      wake_btn = page.locator('text="Yes, get this app back up!"')
-                      if wake_btn.count() > 0:
-                          print("-> Phát hiện app đang ngủ. Đang bấm nút đánh thức...")
-                          wake_btn.first.click()
-                          time.sleep(10)
-                          print("-> Đã gửi lệnh kích hoạt.")
-                      else:
-                          print("-> App vẫn đang thức hoạt động bình thường.")
-                  except Exception as e:
-                      print(f"-> Lỗi khi mở {url}: {e}")
-                  finally:
-                      page.close()
-              browser.close()
+          headers = {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+          }
+
+          for app in apps:
+              url = f"https://{app}.streamlit.app/"
+              print(f"--- Đang gửi tín hiệu tới: {url} ---")
+              try:
+                  # 1. Gửi request đến trang chính
+                  res = requests.get(url, headers=headers, timeout=30)
+                  print(f"Trang chính: {res.status_code}")
+
+                  # 2. Gửi tín hiệu đánh thức qua endpoint nội bộ nếu đang ngủ
+                  wake_url = f"https://share.streamlit.io/api/v1/apps/{app}/wake"
+                  wake_res = requests.post(wake_url, headers=headers, timeout=15)
+                  print(f"Tín hiệu Wake-up: {wake_res.status_code}")
+              except Exception as e:
+                  print(f"Lỗi: {e}")
+
+          print("Đã hoàn tất gửi tín hiệu đánh thức cho toàn bộ ứng dụng!")
           EOF
