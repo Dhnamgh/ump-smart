@@ -47,7 +47,7 @@ jobs:
                       page.goto(url, timeout=60000)
                       time.sleep(5)
                       
-                      # Tìm và bấm nút đánh thức nếu app đang trong trạng thái ngủ
+                      # Tự tìm và bấm nút nếu phát hiện app đang ngủ
                       wake_btn = page.locator('text="Yes, get this app back up!"')
                       if wake_btn.count() > 0:
                           print("-> Phát hiện app đang ngủ. Đang bấm nút đánh thức...")
