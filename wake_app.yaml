@@ -1,0 +1,64 @@
+name: Wake Up App
+
+on:
+  schedule:
+    # 22:45 UTC = 05:45 sáng VN (chuẩn bị ca sáng)
+    - cron: '45 22 * * 0-5'
+    # 05:30 UTC = 12:30 trưa VN (chuẩn bị ca chiều)
+    - cron: '30 5 * * 0-5'
+    # 09:45 UTC = 16:45 chiều VN (chuẩn bị ca tối)
+    - cron: '45 9 * * 0-5'
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Run Wake-Up Script
+        run: |
+          python - << 'EOF'
+          import time
+          from playwright.sync_api import sync_playwright
+
+          urls = [
+              "https://ump-smartattend.streamlit.app/",
+              "https://ump-attendance.streamlit.app/",
+              "https://font-converter.streamlit.app/",
+              "https://regression-myapp.streamlit.app/"
+          ]
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              for url in urls:
+                  print(f"--- Đang truy cập: {url} ---")
+                  page = browser.new_page()
+                  try:
+                      page.goto(url, timeout=60000)
+                      time.sleep(5)
+                      
+                      # Tìm và bấm nút đánh thức nếu app đang trong trạng thái ngủ
+                      wake_btn = page.locator('text="Yes, get this app back up!"')
+                      if wake_btn.count() > 0:
+                          print("-> Phát hiện app đang ngủ. Đang bấm nút đánh thức...")
+                          wake_btn.first.click()
+                          time.sleep(10)
+                          print("-> Đã gửi lệnh kích hoạt.")
+                      else:
+                          print("-> App vẫn đang thức hoạt động bình thường.")
+                  except Exception as e:
+                      print(f"-> Lỗi khi mở {url}: {e}")
+                  finally:
+                      page.close()
+              browser.close()
+          EOF
