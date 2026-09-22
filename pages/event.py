@@ -16,7 +16,7 @@ from io import BytesIO
 # Cấu hình giao diện và chống cache tĩnh
 st.set_page_config(layout="wide")
 
-# Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
+# Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn (Đã chuẩn hóa TPHCM)
 DANH_MUC_DON_VI_LON = [
     "Đảng ủy",
     "Ban Giám hiệu",
@@ -72,8 +72,8 @@ ERP_DISPLAY_TEXT = "Tổ dự án ERP: " + ", ".join(THANH_VIEN_ERP_MAC_DINH)
 
 # Danh mục địa điểm cố định trọng điểm
 DANH_MUC_DIA_DIEM_CO_DINH = [
-    "Phòng họp BGH",
     "Phòng Hội thảo",
+    "Phòng họp BGH",
     "Phòng Hội đồng",
     "Phòng họp Lầu 1",
     "Phòng họp 1-Lầu 2 - Khối K",
@@ -155,7 +155,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     return ""
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (ĐÃ CĂN CHỈNH NÚT SIDEBAR BẰNG NHAU 100%)
+# 1. GIAO DIỆN & CSS (CÂN BẰNG TẤT CẢ NÚT ĐIỀU HƯỚNG SIDEBAR)
 # ==============================================================================
 st.markdown("""
 <style>
@@ -187,53 +187,53 @@ st.markdown("""
     outline: 2px solid #90caf9;
 }
 
-/* Đảm bảo toàn bộ nhóm nút Radio ở khung trái có độ rộng bằng nhau 100% */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] {
+/* Ép tất cả các nút radio ở sidebar có độ dài bằng nhau 100% */
+section[data-testid="stSidebar"] [data-testid="stRadio"] {
     width: 100% !important;
 }
 
-section[data-testid="stSidebar"] div[role="radiogroup"] {
+section[data-testid="stSidebar"] [data-testid="stRadio"] > div {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
     gap: 8px !important;
 }
 
-section[data-testid="stSidebar"] div[role="radiogroup"] label {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label {
     width: 100% !important;
-    min-height: 44px !important;
+    min-height: 42px !important;
     background: #0f5c99 !important;
     border-radius: 8px !important;
-    padding: 10px 14px !important;
-    margin: 2px 0 !important;
+    padding: 8px 14px !important;
+    margin: 0 !important;
     border: 1px solid #0b4a7a !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-start !important;
     box-sizing: border-box !important;
+    cursor: pointer !important;
 }
 
-section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
     background: #0b4a7a !important;
 }
 
-section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label[data-checked="true"] {
     background: #073b63 !important;
     border-left: 5px solid #facc15 !important;
 }
 
-section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
+section[data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"] {
     display: none !important;
 }
 
-section[data-testid="stSidebar"] div[role="radiogroup"] label p {
+section[data-testid="stSidebar"] [data-testid="stRadio"] label p {
     color: #ffffff !important;
-    font-size: 15px !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
     margin: 0 !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+    width: 100% !important;
+    text-align: left !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -942,6 +942,10 @@ if "reg_start_date" not in st.session_state: st.session_state.reg_start_date = t
 if "reg_end_date" not in st.session_state: st.session_state.reg_end_date = today.date()
 if "reg_prev_start_date" not in st.session_state: st.session_state.reg_prev_start_date = st.session_state.reg_start_date
 
+# Quản lý giờ mặc định linh hoạt
+if "reg_start_time" not in st.session_state: st.session_state.reg_start_time = time(7, 0)
+if "reg_end_time" not in st.session_state: st.session_state.reg_end_time = time(11, 0)
+
 num_pending = 0
 if not df.empty:
     num_pending = len(df[df.apply(approval_text_from_row, axis=1) == ""])
@@ -1015,7 +1019,7 @@ def enforce_menu_access(menu_name):
 # 5. CÁC TRANG CHỨC NĂNG
 # ==============================================================================
 
-# --- DASHBOARD (ĐÃ TÙY BIẾN VIỀN ĐẬM RÕ & THU HẸP CHIỀU NGANG CHỦ NHẬT) ---
+# --- DASHBOARD (BỎ TIỀN TỐ NGHỈ LỄ, CON TRỎ BÀN TAY, XUỐNG DÒNG RÕ RÀNG) ---
 if menu == "Dashboard":
     if "dash_msg" in st.session_state:
         st.success(st.session_state.pop("dash_msg"))
@@ -1039,7 +1043,6 @@ if menu == "Dashboard":
         
         has_time = not (s.hour == 0 and s.minute == 0 and e.hour == 0 and e.minute == 0)
         location = clean_text(r.get("location", ""))
-        prefix_icon = "🔴 [NGHỈ LỄ] " if is_holiday else ""
         
         color = event_color(idx, f"{event_name_str}-{s}-{location}", is_holiday=is_holiday)
         text_color = "#FFFFFF" if is_holiday else "#111827"
@@ -1065,7 +1068,10 @@ if menu == "Dashboard":
                 cur_e = datetime.combine(cur_date, sess_e)
                 start_str = cur_s.strftime("%Y-%m-%d %H:%M")
                 end_str = cur_e.strftime("%Y-%m-%d %H:%M")
-                sess_title = f"{prefix_icon}{sess_lbl} - {event_name_str}" + (f"\n📍 {location}" if location else "")
+                
+                # HIỂN THỊ TRỰC TIẾP: KHÔNG DÙNG TỪ [NGHỈ LỄ] NỮA; CHO PHÉP XUỐNG DÒNG ĐỂ ĐỌC ĐỦ CHI TIẾT
+                time_loc_part = f"{sess_lbl}" + (f" 📍 {location}" if location else "")
+                sess_title = f"{event_name_str}\n🕒 {time_loc_part}"
                 
                 events.append({
                     "title": sess_title, 
@@ -1088,7 +1094,7 @@ if menu == "Dashboard":
             event_dates_for_stats.append(datetime.combine(cur_date, time(0, 0)))
             cur_date += timedelta(days=1)
 
-    # TÙY BIẾN CSS FULLCALENDAR: VIỀN ĐẬM RÕ NÉT & THU HẸP CHIỀU NGANG CHỦ NHẬT
+    # CSS CALENDAR: VIỀN ĐẬM, CỘT CHỦ NHẬT THU HẸP, CON TRỎ BÀN TAY VÀ TỰ ĐỘNG XUỐNG DÒNG
     calendar_custom_css = """
         .fc-toolbar-title {
             text-transform: capitalize !important;
@@ -1101,7 +1107,7 @@ if menu == "Dashboard":
             font-weight: 700 !important;
             text-transform: capitalize !important;
         }
-        /* Viền kẻ ô lịch rõ màu, đậm và nổi bật hơn */
+        /* Viền kẻ ô lịch rõ màu, đậm sắc nét */
         .fc-theme-standard td, 
         .fc-theme-standard th,
         .fc-scrollgrid,
@@ -1112,7 +1118,7 @@ if menu == "Dashboard":
         .fc-daygrid-day-frame {
             border-bottom: 1px solid #94a3b8 !important;
         }
-        /* Thu hẹp chiều ngang cột Chủ nhật để dồn diện tích cho các ngày trong tuần */
+        /* Thu hẹp chiều ngang cột Chủ nhật */
         .fc-col-header-cell.fc-day-sun,
         .fc-daygrid-day.fc-day-sun {
             width: 5.5% !important;
@@ -1123,6 +1129,22 @@ if menu == "Dashboard":
         .fc-daygrid-day.fc-day-sun .fc-daygrid-day-top {
             justify-content: center !important;
             opacity: 0.6 !important;
+        }
+        /* CON TRỎ CHUỘT DẠNG BÀN TAY POINTER KHI TRỎ VÀO SỰ KIỆN */
+        .fc-event, 
+        .fc-event-main,
+        a.fc-event {
+            cursor: pointer !important;
+            user-select: none !important;
+        }
+        /* TỰ ĐỘNG XUỐNG DÒNG (2 DÒNG), TRÁNH BỊ CHE KHUẤT TÊN DÀI */
+        .fc-event-main {
+            white-space: pre-line !important;
+            line-height: 1.25 !important;
+            font-size: 12px !important;
+            padding: 3px 4px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
         }
     """
 
@@ -1607,7 +1629,7 @@ if menu == "Dashboard":
     c2.metric("Tháng", sum(1 for d in event_dates_for_stats if d.month == today.month and d.year == today.year))
     c3.metric("Năm", sum(1 for d in event_dates_for_stats if d.year == today.year))
 
-# --- ĐĂNG KÝ ---
+# --- ĐĂNG KÝ (ĐÃ CẬP NHẬT GIỜ LINH HOẠT VÀ ĐỊA ĐIỂM MẶC ĐỊNH PHÒNG HỘI THẢO) ---
 elif menu == "Đăng ký":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📝 Đăng ký sự kiện</div>', unsafe_allow_html=True)
@@ -1616,17 +1638,35 @@ elif menu == "Đăng ký":
     dc1, dc2 = st.columns(2)
     with dc1:
         start_date = st.date_input("Ngày tổ chức", key="reg_start_date")
-        session_opt = st.selectbox("Khung giờ tổ chức mặc định", ["Sáng (07:00 - 11:00)", "Chiều (13:00 - 17:00)", "Tùy chọn giờ"])
-        if session_opt == "Sáng (07:00 - 11:00)": default_start, default_end = time(7, 0), time(11, 0)
-        elif session_opt == "Chiều (13:00 - 17:00)": default_start, default_end = time(13, 0), time(17, 0)
-        else: default_start, default_end = time(7, 0), time(11, 0)
-        start_time = st.time_input("Giờ bắt đầu", value=default_start)
+        
+        # Khung giờ tổ chức: Tự động tính toán hợp lý
+        session_opt = st.selectbox("Khung giờ tổ chức mặc định", ["Sáng (07:00 - 11:00)", "Chiều (13:00 - 17:00)", "Tùy chọn giờ"], key="reg_session_opt")
+        
+        if session_opt == "Sáng (07:00 - 11:00)":
+            def_start = time(7, 0)
+            def_end = time(11, 0)
+        elif session_opt == "Chiều (13:00 - 17:00)":
+            def_start = time(13, 0)
+            def_end = time(17, 0)
+        else:
+            # Tùy chọn giờ: Nếu start time >= 12h thì end time mặc định 17h, ngược lại 11h
+            cur_s = st.session_state.get("input_start_time", time(13, 0) if session_opt == "Tùy chọn giờ" else time(7, 0))
+            def_start = cur_s
+            def_end = time(17, 0) if cur_s.hour >= 12 else time(11, 0)
+
+        start_time = st.time_input("Giờ bắt đầu", value=def_start, key="input_start_time")
+        
     with dc2:
         if st.session_state.reg_start_date != st.session_state.reg_prev_start_date:
             st.session_state.reg_end_date = st.session_state.reg_start_date
             st.session_state.reg_prev_start_date = st.session_state.reg_start_date
         end_date = st.date_input("Ngày kết thúc", key="reg_end_date")
-        end_time = st.time_input("Giờ kết thúc", value=default_end)
+        
+        # Tự động điều chỉnh giờ kết thúc theo giờ bắt đầu đã chọn ở mục Tùy chọn giờ
+        if session_opt == "Tùy chọn giờ":
+            if start_time.hour >= 12 and def_end < start_time:
+                def_end = time(17, 0)
+        end_time = st.time_input("Giờ kết thúc", value=def_end, key="input_end_time")
         
     support_flag = st.selectbox("Có yêu cầu hỗ trợ?", ["KHÔNG", "CÓ"], key="reg_support_flag")
 
@@ -1681,7 +1721,8 @@ elif menu == "Đăng ký":
             bomon_to = st.text_input("Bộ môn / Tổ / Cơ sở trực thuộc (nếu có)", placeholder="Ví dụ: Cơ sở 1, Bộ môn Dược lý, Tổ Lễ tân...")
             
         with f2: 
-            dia_diem_select_list = st.multiselect("Địa điểm tổ chức (chọn một hoặc nhiều)", DANH_MUC_DIA_DIEM_CO_DINH, default=["Phòng họp BGH"])
+            # ĐÃ ĐỔI ĐỊA ĐIỂM MẶC ĐỊNH SANG PHÒNG HỘI THẢO
+            dia_diem_select_list = st.multiselect("Địa điểm tổ chức (chọn một hoặc nhiều)", DANH_MUC_DIA_DIEM_CO_DINH, default=["Phòng Hội thảo"])
             dia_diem_khac = ""
             if "Khác" in dia_diem_select_list:
                 dia_diem_khac = st.text_input("Nhập địa điểm cụ thể khác (ngăn cách bằng dấu phẩy):", placeholder="Ví dụ: Phòng 402 nhà A, Trực tuyến Zoom...")
@@ -2219,4 +2260,4 @@ elif menu == "Liên hệ":
 (+84-28) 3855 8411 | hanhchinh@ump.edu.vn
 """)
 st.markdown("---")
-st.markdown("Copyright © 2026 Bản quyền thuộc về Phòng Hành chính Tổng hợp, Đại học Y Dược Thành phố Hồ Chí Minh")
+st.markdown("Copyright © 2026 Bản quyền thuộc về Phòng Hành chính Tổng hợp, Đại học Y Dược TPHCM")
