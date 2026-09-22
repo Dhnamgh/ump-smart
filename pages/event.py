@@ -16,7 +16,7 @@ from io import BytesIO
 # Cấu hình giao diện và chống cache tĩnh
 st.set_page_config(layout="wide")
 
-# Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn
+# Danh mục đơn vị lớn cấp 1 chuẩn hóa rút gọn (Đã chuẩn hóa TPHCM)
 DANH_MUC_DON_VI_LON = [
     "Đảng ủy",
     "Ban Giám hiệu",
@@ -155,7 +155,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     return ""
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (SỬA TRIỆT ĐỂ LỖI PHÍM TRỐNG VÀ LỆCH KÍCH THƯỚC NÚT SIDEBAR)
+# 1. GIAO DIỆN & CSS (KHÔI PHỤC NÚT XANH GỐC & CĂN ĐỀU 100% BẰNG NHAU)
 # ==============================================================================
 st.markdown("""
 <style>
@@ -187,60 +187,51 @@ st.markdown("""
     outline: 2px solid #90caf9;
 }
 
-/* XỬ LÝ TRIỆT ĐỂ SIDEBAR RADIO */
-/* 1. Ẩn hoàn toàn thẻ tiêu đề rỗng sinh ra phím màu xanh trống ở trên cùng */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] > label {
-    display: none !important;
-}
-
-/* 2. Ép khung chứa radio full width */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] {
-    width: 100% !important;
-}
-
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {
+/* KHÔI PHỤC HOÀN TOÀN CÁC PHÍM ĐIỀU HƯỚNG MÀU XANH BẰNG NHAU 100% */
+section[data-testid="stSidebar"] div[role="radiogroup"] {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
     gap: 8px !important;
 }
 
-/* 3. Từng nút radio kéo dài 100% bề ngang, kích thước bằng nhau tuyệt đối */
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] > label {
-    display: flex !important;
-    align-items: center !important;
+section[data-testid="stSidebar"] div[role="radiogroup"] label {
     width: 100% !important;
-    min-height: 42px !important;
+    min-height: 44px !important;
     background: #0f5c99 !important;
     border-radius: 8px !important;
     padding: 8px 14px !important;
     margin: 0 !important;
     border: 1px solid #0b4a7a !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important;
+    display: flex !important;
+    align-items: center !important;
     box-sizing: border-box !important;
     cursor: pointer !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
     background: #0b4a7a !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] {
+section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
     background: #073b63 !important;
     border-left: 5px solid #facc15 !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] > label input[type="radio"] {
+section[data-testid="stSidebar"] div[role="radiogroup"] input[type="radio"] {
     display: none !important;
 }
 
-section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] > label p {
+section[data-testid="stSidebar"] div[role="radiogroup"] label p {
     color: #ffffff !important;
     font-size: 14px !important;
     font-weight: 700 !important;
     margin: 0 !important;
     width: 100% !important;
     text-align: left !important;
+    opacity: 1 !important;
+    visibility: visible !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -421,13 +412,10 @@ def remove_vietnamese_accents(text):
         text = re.sub(regex, replace_char, text)
     return text
 
-# Chuẩn hóa gọn từ hiển thị trên Lịch (GĐ, Tòa nhà K)
 def format_display_location_for_calendar(loc_str):
     if not loc_str: return ""
     txt = str(loc_str).strip()
-    # Chuẩn hóa Giảng đường thành GĐ
     txt = re.sub(r"(?i)\bgiảng đường\b", "GĐ", txt)
-    # Chuẩn hóa Tòa nhà 15 tầng thành Tòa nhà K
     txt = re.sub(r"(?i)\b(tòa nhà 15 tầng|khu nhà 15 tầng|nhà 15 tầng)\b", "Tòa nhà K", txt)
     return txt
 
@@ -996,8 +984,8 @@ for idx, opt in enumerate(menu_options):
         curr_menu_idx = idx
         break
 
-# Khắc phục lỗi phím trống: Chỉ truyền radio thuần với nhãn ẩn hoàn toàn
-selected_menu = st.sidebar.radio("menu_navigation_radio", menu_options, index=curr_menu_idx, label_visibility="collapsed")
+# KHÔI PHỤC RADIO CHUẨN GỐC - KHÔNG TẠO LABEL RỖNG THỪA
+selected_menu = st.sidebar.radio("", menu_options, index=curr_menu_idx, label_visibility="collapsed")
 
 if selected_menu.startswith("Phê duyệt"): menu = "Phê duyệt"
 elif selected_menu.startswith("Cảnh báo"): menu = "Cảnh báo"
@@ -1033,7 +1021,7 @@ def enforce_menu_access(menu_name):
 # 5. CÁC TRANG CHỨC NĂNG
 # ==============================================================================
 
-# --- DASHBOARD (NGHỈ LỄ KHÔNG GIỜ/KHÔNG CƠ SỞ, CHUẨN HÓA GĐ & TÒA NHÀ K) ---
+# --- DASHBOARD ---
 if menu == "Dashboard":
     if "dash_msg" in st.session_state:
         st.success(st.session_state.pop("dash_msg"))
@@ -1088,7 +1076,6 @@ if menu == "Dashboard":
                 end_str = cur_e.strftime("%Y-%m-%d %H:%M")
                 
                 if is_holiday:
-                    # Chỉ hiển thị duy nhất tên ngày lễ
                     sess_title = event_name_str
                 else:
                     time_loc_part = f"{sess_lbl}" + (f" 📍 {location}" if location else "")
@@ -1650,7 +1637,7 @@ if menu == "Dashboard":
     c2.metric("Tháng", sum(1 for d in event_dates_for_stats if d.month == today.month and d.year == today.year))
     c3.metric("Năm", sum(1 for d in event_dates_for_stats if d.year == today.year))
 
-# --- ĐĂNG KÝ ---
+# --- ĐĂNG KÝ (ĐÃ CẬP NHẬT GIỜ LINH HOẠT VÀ ĐỊA ĐIỂM MẶC ĐỊNH PHÒNG HỘI THẢO) ---
 elif menu == "Đăng ký":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📝 Đăng ký sự kiện</div>', unsafe_allow_html=True)
