@@ -155,7 +155,7 @@ def get_auto_assigned_worker(col_key, location_str=""):
     return ""
 
 # ==============================================================================
-# 1. GIAO DIỆN & CSS (KHÔI PHỤC NÚT XANH GỐC & CĂN ĐỀU 100% BẰNG NHAU)
+# 1. GIAO DIỆN & CSS (CỐ ĐỊNH CHIỀU RỘNG 100% BẰNG NHAU TUYỆT ĐỐI CHO TẤT CẢ NÚT)
 # ==============================================================================
 st.markdown("""
 <style>
@@ -187,20 +187,36 @@ st.markdown("""
     outline: 2px solid #90caf9;
 }
 
-/* KHÔI PHỤC HOÀN TOÀN CÁC PHÍM ĐIỀU HƯỚNG MÀU XANH BẰNG NHAU 100% */
+/* ==================================================================== */
+/* KHẮC PHỤC TRIỆT ĐỂ: ÉP MỌI CẤP CHA CON CỦA SIDEBAR RADIO CĂNG RỘNG 100% */
+/* ==================================================================== */
+section[data-testid="stSidebar"] div[data-testid="stRadio"] {
+    width: 100% !important;
+}
+
 section[data-testid="stSidebar"] div[role="radiogroup"] {
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
+    align-items: stretch !important;
     gap: 8px !important;
 }
 
+/* Khung bọc từng nút (data-baseweb="radio") bắt buộc phải nhận width 100% */
+section[data-testid="stSidebar"] div[role="radiogroup"] > div,
+section[data-testid="stSidebar"] div[role="radiogroup"] [data-baseweb="radio"] {
+    width: 100% !important;
+    display: block !important;
+    flex: 1 1 100% !important;
+}
+
+/* Thẻ label nút bấm căng đều tuyệt đối */
 section[data-testid="stSidebar"] div[role="radiogroup"] label {
     width: 100% !important;
     min-height: 44px !important;
     background: #0f5c99 !important;
     border-radius: 8px !important;
-    padding: 8px 14px !important;
+    padding: 10px 14px !important;
     margin: 0 !important;
     border: 1px solid #0b4a7a !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important;
@@ -412,10 +428,15 @@ def remove_vietnamese_accents(text):
         text = re.sub(regex, replace_char, text)
     return text
 
+# Chuẩn hóa gọn từ hiển thị trên Lịch (ĐGĐ, GĐ, Tòa nhà K)
 def format_display_location_for_calendar(loc_str):
     if not loc_str: return ""
     txt = str(loc_str).strip()
+    # 1. Chuẩn hóa Đại giảng đường hoặc Đại GĐ thành ĐGĐ
+    txt = re.sub(r"(?i)\b(đại giảng đường|đại gđ)\b", "ĐGĐ", txt)
+    # 2. Chuẩn hóa Giảng đường thành GĐ
     txt = re.sub(r"(?i)\bgiảng đường\b", "GĐ", txt)
+    # 3. Chuẩn hóa Tòa nhà 15 tầng thành Tòa nhà K
     txt = re.sub(r"(?i)\b(tòa nhà 15 tầng|khu nhà 15 tầng|nhà 15 tầng)\b", "Tòa nhà K", txt)
     return txt
 
@@ -984,7 +1005,7 @@ for idx, opt in enumerate(menu_options):
         curr_menu_idx = idx
         break
 
-# KHÔI PHỤC RADIO CHUẨN GỐC - KHÔNG TẠO LABEL RỖNG THỪA
+# KHÔI PHỤC RADIO THUẦN TÚY KHÔNG BỊ TRƯỢT CSS
 selected_menu = st.sidebar.radio("", menu_options, index=curr_menu_idx, label_visibility="collapsed")
 
 if selected_menu.startswith("Phê duyệt"): menu = "Phê duyệt"
@@ -1021,7 +1042,7 @@ def enforce_menu_access(menu_name):
 # 5. CÁC TRANG CHỨC NĂNG
 # ==============================================================================
 
-# --- DASHBOARD ---
+# --- DASHBOARD (NGHỈ LỄ KHÔNG GIỜ/KHÔNG CƠ SỞ, CHUẨN HÓA ĐGĐ & TÒA NHÀ K) ---
 if menu == "Dashboard":
     if "dash_msg" in st.session_state:
         st.success(st.session_state.pop("dash_msg"))
@@ -1060,7 +1081,7 @@ if menu == "Dashboard":
         while cur_date <= end_date:
             daily_sessions = []
             
-            # ĐỐI VỚI NGHỈ LỄ: LUÔN NGHỈ CẢ NGÀY, KHÔNG TÁCH BUỔI, KHÔNG HIỂN THỊ GIỜ VÀ ĐỊA ĐIỂM
+            # NGHỈ LỄ: LUÔN NGHỈ CẢ NGÀY, KHÔNG TÁCH BUỔI, KHÔNG HIỂN THỊ GIỜ VÀ ĐỊA ĐIỂM
             if is_holiday:
                 daily_sessions.append((time(0, 0), time(23, 59), ""))
             elif is_multi_day or is_full_day_single:
@@ -1102,7 +1123,6 @@ if menu == "Dashboard":
             event_dates_for_stats.append(datetime.combine(cur_date, time(0, 0)))
             cur_date += timedelta(days=1)
 
-    # CSS CALENDAR: VIỀN ĐẬM, CỘT CHỦ NHẬT THU HẸP, CON TRỎ BÀN TAY, XUỐNG DÒNG RÕ NÉT
     calendar_custom_css = """
         .fc-toolbar-title {
             text-transform: capitalize !important;
@@ -1115,7 +1135,6 @@ if menu == "Dashboard":
             font-weight: 700 !important;
             text-transform: capitalize !important;
         }
-        /* Viền kẻ ô lịch rõ màu, đậm sắc nét */
         .fc-theme-standard td, 
         .fc-theme-standard th,
         .fc-scrollgrid,
@@ -1126,7 +1145,6 @@ if menu == "Dashboard":
         .fc-daygrid-day-frame {
             border-bottom: 1px solid #94a3b8 !important;
         }
-        /* Thu hẹp chiều ngang cột Chủ nhật */
         .fc-col-header-cell.fc-day-sun,
         .fc-daygrid-day.fc-day-sun {
             width: 5.5% !important;
@@ -1138,14 +1156,12 @@ if menu == "Dashboard":
             justify-content: center !important;
             opacity: 0.6 !important;
         }
-        /* Con trỏ dạng bàn tay */
         .fc-event, 
         .fc-event-main,
         a.fc-event {
             cursor: pointer !important;
             user-select: none !important;
         }
-        /* Tự động xuống dòng hiển thị đẹp mắt */
         .fc-event-main {
             white-space: pre-line !important;
             line-height: 1.25 !important;
@@ -1637,7 +1653,7 @@ if menu == "Dashboard":
     c2.metric("Tháng", sum(1 for d in event_dates_for_stats if d.month == today.month and d.year == today.year))
     c3.metric("Năm", sum(1 for d in event_dates_for_stats if d.year == today.year))
 
-# --- ĐĂNG KÝ (ĐÃ CẬP NHẬT GIỜ LINH HOẠT VÀ ĐỊA ĐIỂM MẶC ĐỊNH PHÒNG HỘI THẢO) ---
+# --- ĐĂNG KÝ ---
 elif menu == "Đăng ký":
     if not enforce_menu_access(menu): st.stop()
     st.markdown('<div class="table-title">📝 Đăng ký sự kiện</div>', unsafe_allow_html=True)
