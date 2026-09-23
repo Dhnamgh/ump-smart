@@ -1,27 +1,67 @@
-name: Wake Up App
+name: Wake Streamlit App
 
 on:
   schedule:
-    # 22:45 UTC = 05:45 sáng VN (chuẩn bị ca sáng)
-    - cron: '45 22 * * 0-5'
-    # 05:30 UTC = 12:30 trưa VN (chuẩn bị ca chiều)
-    - cron: '30 5 * * 0-5'
-    # 09:45 UTC = 16:45 chiều VN (chuẩn bị ca tối)
-    - cron: '45 9 * * 0-5'
-  workflow_dispatch:
+    # Chạy mỗi 6 tiếng một lần để giữ app luôn thức (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Cho phép bấm chạy thủ công kiểm tra bất kỳ lúc nào
 
 jobs:
   wake:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Auto Empty Commit to Reset Streamlit Timer
+      - name: Install Playwright & Dependencies
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git commit --allow-empty -m "Auto keep-alive trigger [skip ci]"
-          git push
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
+
+      - name: Open and Wake App
+        run: |
+          python - << 'EOF'
+          import time
+          from playwright.sync_api import sync_playwright
+
+          # Điền link app Streamlit :
+          APP_URLS = [
+              "https://ump-attendance.streamlit.app",
+              "https://font-converter.streamlit.app",
+              "https://ump-smart.streamlit.app",
+              "https://regression-myapp.streamlit.app"
+          ]
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              context = browser.new_context(
+                  user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              )
+              page = context.new_page()
+
+              for url in APP_URLS:
+                  print(f"--- Đang kiểm tra: {url} ---")
+                  try:
+                      page.goto(url, wait_until="networkidle", timeout=90000)
+                      time.sleep(3)
+
+                      # Tìm nút 'Yes, get this app back up!'
+                      wake_btn = page.get_by_role("button", name=re.compile("Yes, get this app back up!", re.I)) if False else page.locator('button:has-text("Yes, get this app back up!")')
+                      
+                      if wake_btn.count() > 0 and wake_btn.first.is_visible():
+                          print("-> Phát hiện app đang ngủ (Zzz). Đang tự động click đánh thức...")
+                          wake_btn.first.click()
+                          # Đợi app boot lại
+                          time.sleep(15)
+                          print("-> Đã bấm nút đánh thức thành công!")
+                      else:
+                          print("-> App đang thức bình thường hoặc không có nút ngủ.")
+                          
+                  except Exception as e:
+                      print(f"Lỗi khi truy cập {url}: {e}")
+
+              browser.close()
+          EOF
