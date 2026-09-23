@@ -28,10 +28,11 @@ jobs:
 
           # Danh sách toàn bộ các app cần duy trì hoạt động
           APP_URLS = [
+              "https://umpevent.streamlit.app",
               "https://ump-attendance.streamlit.app",
               "https://font-converter.streamlit.app",
               "https://ump-smart.streamlit.app",
-              "https://regression-myapp.streamlit.app",
+              "https://regression-myapp.streamlit.app"
               # Thêm các app khác vào đây
           ]
 
