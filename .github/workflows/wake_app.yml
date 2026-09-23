@@ -2,7 +2,6 @@ name: Wake Streamlit App
 
 on:
   schedule:
-    # Tự động chạy mỗi 6 tiếng (hoặc đổi thành '0 */4 * * *' nếu muốn 4 tiếng/lần)
     - cron: '0 */6 * * *'
   workflow_dispatch:
 
@@ -15,48 +14,53 @@ jobs:
         with:
           python-version: '3.11'
 
+      # 1. Caching trình duyệt để không phải tải lại mỗi lần chạy
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium
+
+      # 2. Cài nhanh playwright và chỉ tải chromium cốt lõi (bỏ qua with-deps)
       - name: Install Playwright & Chromium
         run: |
           pip install playwright
-          playwright install chromium --with-deps
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            playwright install chromium
+          fi
 
+      # 3. Quá trình quét song song tốc độ cao (14s)
       - name: Parallel Wake Apps
         run: |
           python - << 'EOF'
           import asyncio
           from playwright.async_api import async_playwright
 
-          # Danh sách toàn bộ các app cần duy trì hoạt động
           APP_URLS = [
-              "https://umpevent.streamlit.app",
               "https://ump-attendance.streamlit.app",
+              "https://regression-myapp.streamlit.app",
               "https://font-converter.streamlit.app",
-              "https://ump-smart.streamlit.app",
-              "https://regression-myapp.streamlit.app"
-              # Thêm các app khác vào đây
+              "https://ump-smart.streamlit.app"
           ]
 
           async def check_and_wake(context, url):
               page = await context.new_page()
               print(f"[Bắt đầu] Đang mở: {url}")
               try:
-                  # Tải trang nhanh, chỉ chờ nạp xong DOM
                   await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                  
-                  # Chờ tối đa 7 giây xem nút đánh thức có xuất hiện không
                   btn_selector = 'button:has-text("Yes, get this app back up!")'
                   try:
                       wake_btn = await page.wait_for_selector(btn_selector, timeout=7000)
                       if wake_btn:
                           print(f"[ĐANG NGỦ] -> Đang click đánh thức: {url}")
                           await wake_btn.click(force=True)
-                          await asyncio.sleep(4)  # Đợi nhẹ 4s để request kích hoạt kịp gửi đi
+                          await asyncio.sleep(4)
                           print(f"[THÀNH CÔNG] -> Đã gửi lệnh gọi app dậy: {url}")
                       else:
-                          print(f"[HOẠT ĐỘNG] -> App đang thức: {url}")
+                          print(f"[HOẠT ĐỘNG] -> Không có nút Zzzz (App đang thức): {url}")
                   except Exception:
                       print(f"[HOẠT ĐỘNG] -> Không có nút Zzzz (App đang thức): {url}")
-                      
               except Exception as e:
                   print(f"[LỖI] {url}: {e}")
               finally:
@@ -68,11 +72,8 @@ jobs:
                   context = await browser.new_context(
                       user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                   )
-                  
-                  # Chạy đồng thời tất cả các app cùng lúc
                   tasks = [check_and_wake(context, url) for url in APP_URLS]
                   await asyncio.gather(*tasks)
-                  
                   await browser.close()
                   print(">>> Đã kiểm tra xong đồng loạt tất cả các app!")
 
