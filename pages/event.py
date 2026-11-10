@@ -561,7 +561,6 @@ def wrap_label(text, width=26):
 def extract_parent_donvi(donvi_text):
     txt = clean_text(donvi_text)
     if not txt: return "Khác"
-    # Tìm kiếm các đơn vị chuẩn hóa có trong chuỗi
     found_units = []
     for dv in DANH_MUC_DON_VI_LON:
         if dv != "Khác" and dv.lower() in txt.lower():
@@ -855,7 +854,6 @@ def build_support_table_with_status(df_input):
             raw_val = r.get(col_key, "")
             qty = 0
             
-            # Tự động nhận diện Chạy bảng điện tử khi cờ là Có HOẶC có nội dung text
             if col_key == "support_bang_dien_tu":
                 content_led = clean_text(r.get("Nội dung chạy bảng điện tử (nếu có)", ""))
                 if is_yes(raw_val) or (content_led and content_led.upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"]):
@@ -1391,7 +1389,7 @@ if menu == "Dashboard":
                 st.session_state.selected_event_details = None
                 st.rerun()
                 
-        # ================= MỤC ĐIỀU CHỈNH SỰ KIỆN TRÊN DASHBOARD (ĐA ĐƠN VỊ) =================
+        # ================= MỤC ĐIỀU CHỈNH TOÀN DIỆN SỰ KIỆN TRÊN DASHBOARD =================
         with col_act2:
             with st.expander("✏️ Quản trị viên: Điều chỉnh sự kiện"):
                 if not st.session_state.get("admin_logged_in", False):
@@ -1518,65 +1516,4 @@ if menu == "Dashboard":
                         edit_other_tp = st.text_input("Nhập đại biểu/khách mời khác (nếu có):", placeholder="VD: Đại diện Bộ Y tế, Khách mời...", key=f"ed_oth_tp_{ev_id}")
 
                     st.markdown("---")
-                    st.markdown("##### 🛠️ Điều chỉnh các Hạng mục Hỗ trợ:")
-                    cur_supp_flag = is_yes(raw_row_data.get("support", ""))
-                    e_supp_flag = st.selectbox("Yêu cầu hỗ trợ:", ["CÓ", "KHÔNG"], index=0 if cur_supp_flag else 1, key=f"de_supp_flg_{ev_id}")
-                    
-                    edit_support_vals = {}
-                    if e_supp_flag == "CÓ":
-                        st.caption("Chỉnh sửa số lượng hoặc yêu cầu các hạng mục hỗ trợ:")
-                        es_col1, es_col2 = st.columns(2)
-                        with es_col1:
-                            edit_support_vals["support_ban_don_tiep"] = st.number_input("Bàn đón tiếp", min_value=0, value=count_value(raw_row_data.get("support_ban_don_tiep", 0)), step=1, key=f"ed_ban_{ev_id}")
-                            edit_support_vals["support_khan_ban"] = st.selectbox("Trải khăn bàn hội trường", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_khan_ban", "")) else 0, key=f"ed_khan_{ev_id}")
-                            edit_support_vals["support_le_tan"] = st.number_input("Số lượng lễ tân", min_value=0, value=count_value(raw_row_data.get("support_le_tan", 0)), step=1, key=f"ed_letan_{ev_id}")
-                            edit_support_vals["support_bang_ten"] = st.number_input("Bảng tên mica", min_value=0, value=count_value(raw_row_data.get("support_bang_ten", 0)), step=1, key=f"ed_bangten_{ev_id}")
-                            edit_support_vals["support_bia_ky_ket"] = st.number_input("Bìa ký kết", min_value=0, value=count_value(raw_row_data.get("support_bia_ky_ket", 0)), step=1, key=f"ed_bia_{ev_id}")
-                            edit_support_vals["support_bao_ve"] = st.selectbox("Bảo vệ", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_bao_ve", "")) else 0, key=f"ed_bv_{ev_id}")
-                            edit_support_vals["support_dang_tin"] = st.selectbox("Đăng tin truyền thông", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_dang_tin", "")) else 0, key=f"ed_dangtin_{ev_id}")
-                            edit_support_vals["support_y_te"] = st.selectbox("Y tế", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_y_te", "")) else 0, key=f"ed_yte_{ev_id}")
-                        with es_col2:
-                            edit_support_vals["support_hoa_ban"] = st.number_input("Số lượng hoa để bàn (hoa giả)", min_value=0, value=count_value(raw_row_data.get("support_hoa_ban", 0)), step=1, key=f"ed_hban_{ev_id}")
-                            edit_support_vals["support_hoa_buc"] = st.number_input("Hoa bục phát biểu (hoa giả)", min_value=0, value=count_value(raw_row_data.get("support_hoa_buc", 0)), step=1, key=f"ed_hbuc_{ev_id}")
-                            edit_support_vals["support_khay_bung"] = st.number_input("Khay bưng", min_value=0, value=count_value(raw_row_data.get("support_khay_bung", 0)), step=1, key=f"ed_khay_{ev_id}")
-                            edit_support_vals["support_brochure"] = st.number_input("Brochure", min_value=0, value=count_value(raw_row_data.get("support_brochure", 0)), step=1, key=f"ed_bro_{ev_id}")
-                            edit_support_vals["support_may_tinh_chieu"] = st.selectbox("Máy tính & thiết bị chiếu", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_may_tinh_chieu", "")) else 0, key=f"ed_mt_{ev_id}")
-                            edit_support_vals["support_van_thu"] = st.selectbox("Văn thư (CV, đóng dấu...)", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_van_thu", "")) else 0, key=f"ed_vt_{ev_id}")
-                            edit_support_vals["support_canh_quan"] = st.selectbox("Cảnh quan - VS", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_canh_quan", "")) else 0, key=f"ed_cq_{ev_id}")
-                            edit_support_vals["support_xe_dua_don"] = st.selectbox("Xe đưa đón đại biểu", ["KHÔNG", "CÓ"], index=1 if is_yes(raw_row_data.get("support_xe_dua_don", "")) else 0, key=f"ed_xe_{ev_id}")
-                            
-                            cur_bdt_raw = raw_row_data.get("support_bang_dien_tu", "")
-                            cur_bdt_content = clean_text(raw_row_data.get("Nội dung chạy bảng điện tử (nếu có)", ""))
-                            bdt_pre_idx = 1 if (is_yes(cur_bdt_raw) or (cur_bdt_content and cur_bdt_content.upper() not in ["KHÔNG", "KHONG", "NO", "N", "FALSE", "0"])) else 0
-                            
-                            edit_support_vals["support_bang_dien_tu"] = st.selectbox("Chạy bảng điện tử (SL: 2)", ["KHÔNG", "CÓ"], index=bdt_pre_idx, key=f"ed_bdt_{ev_id}")
-                            if is_yes(edit_support_vals["support_bang_dien_tu"]):
-                                edit_support_vals["noi_dung_bang_dien_tu"] = st.text_area("Nội dung chạy bảng LED:", value=cur_bdt_content, key=f"ed_nbdt_{ev_id}")
-                            else:
-                                edit_support_vals["noi_dung_bang_dien_tu"] = ""
-                                
-                            edit_support_vals["support_khac"] = st.text_area("Khác", value=clean_text(raw_row_data.get("support_khac", "")), key=f"ed_khac_{ev_id}")
-                    
-                    if st.button("💾 Lưu các điều chỉnh", type="primary", key=f"btn_save_edit_{ev_id}"):
-                        with st.spinner("Đang lưu cập nhật và tự động gán phân công..."):
-                            new_tp_list = []
-                            if edit_bgh_sel: new_tp_list.extend(edit_bgh_sel)
-                            
-                            if edit_dh_truong: new_tp_list.append("Đơn vị thuộc, trực thuộc ĐHYD: Cấp Trưởng")
-                            if edit_dh_all: new_tp_list.append("Đơn vị thuộc, trực thuộc ĐHYD: Cấp Trưởng và cấp Phó")
-                            if edit_khac_truong: new_tp_list.append("Đơn vị khác: Trưởng đơn vị")
-                            if edit_khac_all: new_tp_list.append("Đơn vị khác: Trưởng và phó đơn vị")
-                            
-                            other_dv_sel = [d for d in edit_custom_dv if d != "Tổ dự án ERP"]
-                            if other_dv_sel: new_tp_list.append("Đơn vị: " + ", ".join(other_dv_sel))
-                            if "Tổ dự án ERP" in edit_custom_dv:
-                                new_tp_list.append(ERP_DISPLAY_TEXT)
-                                
-                            if edit_other_tp.strip(): new_tp_list.append(edit_other_tp.strip())
-                            final_tp_updated = "\n".join(new_tp_list) if new_tp_list else cur_tp_raw
-                            
-                            df_ex = read_onedrive_excel()
-                            idx_matches = df_ex.index[(df_ex["Id"].astype(str).str.strip().str.replace(".0", "", regex=False) == ev_id) | (pd.to_numeric(df_ex["Id"], errors="coerce") == pd.to_numeric(ev_id, errors="coerce"))].tolist()
-                            if idx_matches:
-                                row_i = idx_matches[0]
-                                now_str = datetime.now().strftime("%d
+                    st.markdown("##### 🛠️
