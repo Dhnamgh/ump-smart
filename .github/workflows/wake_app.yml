@@ -30,6 +30,7 @@ jobs:
               "https://regression-myapp.streamlit.app",
               "https://font-converter.streamlit.app",
               "https://ump-smart.streamlit.app",
+              "https://mytranslate.streamlit.app",
               "https://qrcarump.streamlit.app"
           ]
 
