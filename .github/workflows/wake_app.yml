@@ -1,40 +1,59 @@
-import asyncio
+name: Wake Streamlit App
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright & System Dependencies
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Parallel Wake Apps
+        run: |
+          python - << 'EOF'
+          import asyncio
           from playwright.async_api import async_playwright
 
           APP_URLS = [
-              "https://ump-smart.streamlit.app",
-              "https://ump-smart.streamlit.app/event",
               "https://ump-attendance.streamlit.app",
               "https://regression-myapp.streamlit.app",
-              "https://font-converter.streamlit.app"
+              "https://font-converter.streamlit.app",
+              "https://ump-smart.streamlit.app",
+              "https://qrcarump.streamlit.app"
           ]
 
-          async def check_and_wake(page, url):
+          async def check_and_wake(context, url):
+              page = await context.new_page()
               print(f"[Bắt đầu] Đang mở: {url}")
               try:
-                  # Cho phép đợi tối đa 60 giây để trang tải xong
-                  await page.goto(url, wait_until="networkidle", timeout=60000)
-                  
-                  # Bộ chọn nút thức tiếng Anh/tiếng Việt của Streamlit
-                  btn_selector = 'button:has-text("Yes, get this app back up!"), button:has-text("get this app back up")'
+                  await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                  btn_selector = 'button:has-text("Yes, get this app back up!")'
                   try:
-                      # Nâng thời gian chờ nút xuất hiện lên 18 giây cho app nặng
-                      wake_btn = await page.wait_for_selector(btn_selector, timeout=18000)
+                      wake_btn = await page.wait_for_selector(btn_selector, timeout=7000)
                       if wake_btn:
-                          print(f"[ĐANG NGỦ] -> Click đánh thức: {url}")
+                          print(f"[ĐANG NGỦ] -> Đang click đánh thức: {url}")
                           await wake_btn.click(force=True)
-                          # Giữ kết nối 12 giây để container trên Streamlit kịp nạp code
-                          await page.wait_for_timeout(12000)
-                          print(f"[THÀNH CÔNG] -> Đã gọi app dậy: {url}")
+                          await asyncio.sleep(4)
+                          print(f"[THÀNH CÔNG] -> Đã gửi lệnh gọi app dậy: {url}")
                       else:
-                          # Giữ kết nối 5 giây duy trì session
-                          await page.wait_for_timeout(5000)
-                          print(f"[HOẠT ĐỘNG] -> App đang thức: {url}")
+                          print(f"[HOẠT ĐỘNG] -> Không có nút Zzzz (App đang thức): {url}")
                   except Exception:
-                      await page.wait_for_timeout(5000)
-                      print(f"[HOẠT ĐỘNG] -> Không phát hiện nút ngủ (App đang thức): {url}")
+                      print(f"[HOẠT ĐỘNG] -> Không có nút Zzzz (App đang thức): {url}")
               except Exception as e:
-                  print(f"[LỖI KẾT NỐI] {url}: {e}")
+                  print(f"[LỖI] {url}: {e}")
+              finally:
+                  await page.close()
 
           async def main():
               async with async_playwright() as p:
@@ -42,14 +61,10 @@ import asyncio
                   context = await browser.new_context(
                       user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
                   )
-                  page = await context.new_page()
-                  
-                  # Chạy tuần tự từng app để đảm bảo toàn bộ CPU và mạng tập trung đánh thức từng app
-                  for url in APP_URLS:
-                      await check_and_wake(page, url)
-                      await asyncio.sleep(2)
-                      
+                  tasks = [check_and_wake(context, url) for url in APP_URLS]
+                  await asyncio.gather(*tasks)
                   await browser.close()
-                  print(">>> Đã hoàn thành đánh thức toàn bộ các app!")
+                  print(">>> Đã kiểm tra xong đồng loạt tất cả các app!")
 
           asyncio.run(main())
+          EOF
