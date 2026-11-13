@@ -1162,14 +1162,14 @@ if menu == "Dashboard":
             justify-content: center !important;
             opacity: 0.6 !important;
         }
-        /* LÀM MỜ RÕ RỆT CÁC NGÀY THUỘC THÁNG TRƯỚC/SAU */
+        /* LÀM MỜ DỊU CÁC NGÀY THUỘC THÁNG TRƯỚC/SAU */
         td.fc-daygrid-day.fc-day-other {
-            background-color: #f1f5f9 !important;
-            opacity: 0.25 !important;
+            background-color: #f8fafc !important;
+            opacity: 0.48 !important;
         }
         td.fc-daygrid-day.fc-day-other .fc-daygrid-day-top,
         td.fc-daygrid-day.fc-day-other .fc-daygrid-day-events {
-            opacity: 0.25 !important;
+            opacity: 0.65 !important;
         }
         .fc-event, 
         .fc-event-main,
@@ -1185,6 +1185,19 @@ if menu == "Dashboard":
             overflow: hidden !important;
             text-overflow: ellipsis !important;
         }
+        @media screen and (max-width: 768px) {
+            .fc-daygrid-day-frame {
+                min-height: 48px !important;
+            }
+            .fc-event-main {
+                font-size: 10px !important;
+                padding: 2px !important;
+                line-height: 1.15 !important;
+            }
+            .fc-col-header-cell-cushion {
+                font-size: 11px !important;
+            }
+        }
     """
 
     calendar_output = calendar(
@@ -1193,6 +1206,7 @@ if menu == "Dashboard":
             "initialView": "dayGridMonth",
             "locale": "vi",
             "firstDay": 1,
+            "fixedWeekCount": False,
             "height": "auto",
             "contentHeight": "auto",
             "aspectRatio": 1.1,
